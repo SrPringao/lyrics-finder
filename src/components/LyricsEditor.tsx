@@ -46,23 +46,24 @@ export function LyricsEditor({ trackId, initialText, startOpen }: { trackId: num
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2 text-sm">
-        <button onClick={() => setOpen((o) => !o)} className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-50">
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <button type="button" onClick={() => setOpen((o) => !o)} className="rounded-full bg-pill px-[13px] py-1.5 text-ink hover:bg-hairline">
           {open ? "Cerrar editor" : initialText ? "Editar letra" : "Pegar letra"}
         </button>
         <button
+          type="button"
           onClick={() => call("fetch")}
           disabled={busy !== null}
-          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-50 disabled:opacity-40"
+          className="rounded-full bg-pill px-[13px] py-1.5 text-ink hover:bg-hairline disabled:opacity-40"
         >
           {busy === "fetch" ? "Buscando…" : "Buscar de nuevo en LRCLIB"}
         </button>
-        {msg && <span className="self-center text-stone-600">{msg}</span>}
+        {msg && <span className="text-secondary">{msg}</span>}
       </div>
 
       {open && (
-        <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-stone-500">
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-secondary">
             Pega texto normal, o formato LRC (<code>[01:23.45] línea</code>) para guardarla con tiempos. Déjalo vacío y guarda
             para borrarla.
           </p>
@@ -70,12 +71,14 @@ export function LyricsEditor({ trackId, initialText, startOpen }: { trackId: num
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={16}
-            className="w-full rounded-md border border-stone-300 p-3 font-mono text-sm focus:border-emerald-500 focus:outline-none"
+            aria-label="Letra"
+            className="w-full rounded-[14px] border border-input-underline p-4 font-mono text-[13px] text-ink outline-none focus:border-accent"
           />
           <button
+            type="button"
             onClick={() => call("save")}
             disabled={busy !== null}
-            className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-40"
+            className="self-start rounded-full bg-ink px-[13px] py-1.5 text-[13px] text-white disabled:opacity-40"
           >
             {busy === "save" ? "Guardando…" : "Guardar letra"}
           </button>

@@ -1,31 +1,98 @@
 @import "tailwindcss";
 
-:root {
-  --background: #faf9f7;
-  --foreground: #1c1917;
+/* Opción E · Tinte de portada (referencia: docs/diseno-opcion-E.html) */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-ink: #1d1d1f;
+  --color-secondary: #6e6e73;
+  --color-snippet: #48484a; /* línea encontrada en los resultados */
+  --color-hairline: #ececef;
+  --color-pill: #f2f2f4;
+  --color-input-underline: #d2d2d7;
+  --color-disabled: #c7c7cc;
+  --color-accent: #2e6b3c;
+  --color-warn: #b4532a; /* sin letra / error */
+
+  /* Panel "Ahora suena": valores por defecto; se recalculan con la portada (src/lib/player/tint.ts). */
+  --color-tint: #e6ece2;
+  --color-tint-ink: #1e2a1b;
+  --color-tint-secondary: #5a6a55;
+  --color-tint-accent: #2e6b3c;
+  --color-tint-mark: #5e8e5a;
+  --color-tint-chip: #dce3d8;
+
+  --color-spotify: #1db954;
+  --color-spotify-hover: #1aa34a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Registradas para que el cambio de tinte entre canciones tenga transición. */
+@property --color-tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e6ece2;
+}
+@property --color-tint-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1e2a1b;
+}
+@property --color-tint-secondary {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5a6a55;
+}
+@property --color-tint-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e6b3c;
+}
+@property --color-tint-mark {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5e8e5a;
+}
+@property --color-tint-chip {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dce3d8;
+}
+
+:root {
+  transition:
+    --color-tint 600ms ease,
+    --color-tint-ink 600ms ease,
+    --color-tint-secondary 600ms ease,
+    --color-tint-accent 600ms ease,
+    --color-tint-mark 600ms ease,
+    --color-tint-chip 600ms ease;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 
-mark {
-  background: #fde68a;
-  color: inherit;
-  border-radius: 0.2rem;
-  padding: 0 0.1rem;
+button {
+  cursor: pointer;
 }
 
-/* Línea enlazada desde los resultados (#l12) */
+/* Desvanecido arriba y abajo de la letra sincronizada */
+.lyr {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);
+}
+
+/* Línea enlazada desde los resultados (#l12) cuando no hay Spotify */
 li:target {
-  background: #fef3c7;
-  border-radius: 0.375rem;
+  background: var(--color-tint);
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition: none;
+  }
 }

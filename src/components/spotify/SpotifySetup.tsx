@@ -64,23 +64,23 @@ export function SpotifySetup({
   return (
     <div className="space-y-6">
       {hasClientId && !editing && (
-        <section className="space-y-3 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-stone-700">
+        <section className="space-y-3 border-t border-hairline pt-6">
+          <p className="text-sm text-ink">
             App de Spotify configurada (Client ID <code className="font-mono">{maskedClientId}</code>
             {source === "env" ? ", desde .env.local" : source === "code" ? ", incluido en la app" : ""}).
           </p>
           {connectedAs ? (
-            <p className="text-sm text-emerald-700">Conectado como {connectedAs}.</p>
+            <p className="text-sm text-accent">Conectado como {connectedAs}.</p>
           ) : (
             <a
               href={connectHref}
-              className="inline-flex rounded-full bg-[#1DB954] px-4 py-2 text-sm font-medium text-white hover:bg-[#1aa34a]"
+              className="inline-flex rounded-full bg-spotify px-4 py-2 text-sm font-semibold text-white hover:bg-spotify-hover"
             >
               Conectar Spotify
             </a>
           )}
           {source === "ui" && (
-            <button onClick={() => setEditing(true)} className="block text-xs text-stone-500 underline hover:text-stone-800">
+            <button onClick={() => setEditing(true)} className="block text-xs text-secondary underline hover:text-ink">
               Cambiar Client ID
             </button>
           )}
@@ -88,16 +88,16 @@ export function SpotifySetup({
       )}
 
       {editing && (
-        <section className="space-y-5 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-stone-700">
+        <section className="space-y-5 border-t border-hairline pt-6">
+          <p className="text-sm text-ink">
             Spotify solo permite iniciar sesión desde aplicaciones registradas. Regístrala una vez (2 minutos) y listo: después
             solo picas &quot;Conectar Spotify&quot; y aceptas, igual que en TuneMyMusic.
           </p>
 
-          <ol className="list-decimal space-y-3 pl-5 text-sm text-stone-700">
+          <ol className="list-decimal space-y-3 pl-5 text-sm text-ink">
             <li>
               Abre{" "}
-              <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-emerald-700 underline">
+              <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-accent underline">
                 developer.spotify.com/dashboard
               </a>
               , inicia sesión y haz clic en <strong>Create app</strong>.
@@ -106,11 +106,11 @@ export function SpotifySetup({
             <li>
               En <strong>Redirect URIs</strong> pega exactamente esto y presiona <strong>Add</strong>:
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <code className="rounded-md bg-stone-100 px-2 py-1 font-mono text-xs">{redirectUri}</code>
+                <code className="rounded-[6px] bg-pill px-2 py-1 font-mono text-xs">{redirectUri}</code>
                 <button
                   type="button"
                   onClick={copy}
-                  className="rounded-md border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50"
+                  className="rounded-full bg-pill px-3 py-1 text-xs hover:bg-hairline"
                 >
                   {copied ? "Copiado" : "Copiar"}
                 </button>
@@ -133,18 +133,18 @@ export function SpotifySetup({
               placeholder="Client ID (32 caracteres)"
               spellCheck={false}
               autoComplete="off"
-              className="flex-1 rounded-md border border-stone-300 px-3 py-2 font-mono text-sm focus:border-emerald-500 focus:outline-none"
+              className="flex-1 border-0 border-b border-input-underline bg-transparent px-0 py-2 font-mono text-sm outline-none focus:border-accent"
             />
             <button
               disabled={busy || !clientId.trim()}
-              className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-40"
+              className="rounded-full bg-ink px-5 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
             >
               {busy ? "Guardando…" : "Guardar"}
             </button>
           </form>
-          {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p className="text-[13px] text-warn">{error}</p>}
 
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-secondary">
             Para que tus amigos usen la app con su cuenta, agrega su correo en <strong>User Management</strong> dentro de tu app
             de Spotify (máximo 5 personas).
           </p>
@@ -152,7 +152,7 @@ export function SpotifySetup({
       )}
 
       {onLocalhost && (
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-secondary">
           Nota: al conectar, la app se abrirá en {origin} en lugar de localhost; Spotify lo exige. Usa esa dirección de ahora
           en adelante.
         </p>

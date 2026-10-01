@@ -1,50 +1,46 @@
 "use client";
 
-import Link from "next/link";
 import { PlayIcon, SpinnerIcon } from "@/components/Icons";
-import { formatTime } from "@/lib/parsers/lrc";
 import { useSpotify } from "./SpotifyProvider";
 
-/**
- * Timestamp clicable: con Spotify conectado reproduce la canción desde ese segundo;
- * sin sesión, lleva a la línea dentro de la letra.
- */
+/** Botón para reproducir una canción (desde un tiempo o desde el inicio). Solo con Spotify conectado. */
 export function PlayButton({
   trackId,
-  timeMs,
-  lineIndex,
+  timeMs = null,
   label,
-  className = "",
+  variant = "pill",
 }: {
   trackId: number;
-  timeMs: number | null;
-  lineIndex?: number;
+  timeMs?: number | null;
   label?: string;
-  className?: string;
+  variant?: "pill" | "icon";
 }) {
   const { status, play, playingKey } = useSpotify();
-  const key = `${trackId}:${lineIndex ?? "start"}`;
-  const text = label ?? (timeMs == null ? "—" : formatTime(timeMs));
-
-  if (!status?.connected) {
-    if (lineIndex == null) return null;
+  if (!status?.connected) return null;
+  const key = `${trackId}:start`;
+  const busy = playingKey === key;
+  if (variant === "icon") {
     return (
-      <Link href={`/cancion/${trackId}#l${lineIndex}`} className={`font-mono text-xs text-emerald-700 hover:underline ${className}`}>
-        {text}
-      </Link>
+      <button
+        type="button"
+        onClick={() => void play(trackId, timeMs, key)}
+        disabled={busy}
+        aria-label="Reproducir"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-accent hover:bg-pill disabled:opacity-50"
+      >
+        {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
+      </button>
     );
   }
-
-  const busy = playingKey === key;
   return (
     <button
-      onClick={() => play(trackId, timeMs, key)}
+      type="button"
+      onClick={() => void play(trackId, timeMs, key)}
       disabled={busy}
-      title={timeMs == null ? "Reproducir desde el inicio" : `Reproducir desde ${formatTime(timeMs)}`}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-xs text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 ${className}`}
+      className="inline-flex items-center gap-1.5 rounded-full bg-ink px-[13px] py-1.5 text-[13px] text-white disabled:opacity-50"
     >
       {busy ? <SpinnerIcon /> : <PlayIcon />}
-      {text}
+      {label ?? "Reproducir"}
     </button>
   );
 }

@@ -1,87 +1,90 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { Cover } from "@/components/Cover";
+import { pageHref, Pagination } from "@/components/Pagination";
 import { PlaylistActions } from "@/components/PlaylistActions";
-import { StatusBadge } from "@/components/StatusBadge";
+import { LyricsStatusDot } from "@/components/StatusDot";
 import { getDb } from "@/lib/db";
 import { listPlaylists, listTracksWithoutLyrics } from "@/lib/db/repo";
 import { getSearchBlockedUntil, quotaMessage } from "@/lib/spotify/api";
 
 const SOURCE_LABEL: Record<string, string> = { spotify: "Spotify", apple: "Apple Music", csv: "CSV" };
+const PER_PAGE = 25;
+const row = "grid min-h-16 grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-[14px] border-b border-hairline py-2.5";
 
-export default async function BibliotecaPage() {
+export default async function BibliotecaPage({ searchParams }: PageProps<"/biblioteca">) {
   await connection();
+  const sp = await searchParams;
   const db = getDb();
   const playlists = listPlaylists(db);
-  const missing = listTracksWithoutLyrics(db);
+  const missing = listTracksWithoutLyrics(db, sp.p, PER_PAGE);
   const spotifyBlocked = getSearchBlockedUntil(db);
 
   return (
-    <div className="space-y-10">
+    <div className="flex min-h-0 flex-1 flex-col gap-10">
       {spotifyBlocked && (
-        <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {quotaMessage(spotifyBlocked)} Mientras tanto puedes reproducir las canciones ya vinculadas, y las demás se abren
-          con “Buscar en Spotify”.
+        <p className="flex items-start gap-1.5 text-[13px] text-secondary">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
+          {quotaMessage(spotifyBlocked)} Mientras tanto puedes reproducir las canciones ya vinculadas.
         </p>
       )}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Playlists</h1>
-          <Link href="/importar" className="rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700">
-            + Importar
+
+      <section>
+        <div className="flex items-center justify-between border-b border-hairline pb-3">
+          <h1 className="text-[30px] font-bold tracking-[-0.03em]">Playlists</h1>
+          <Link href="/importar" className="text-[13px] font-semibold text-accent hover:underline">
+            Importar
           </Link>
         </div>
         {playlists.length === 0 ? (
-          <p className="text-sm text-stone-600">Todavía no has importado ninguna playlist.</p>
+          <p className="pt-5 text-sm text-secondary">Todavía no has importado ninguna playlist.</p>
         ) : (
-          <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white shadow-sm">
-            {playlists.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <Link href={`/biblioteca/${p.id}`} className="font-medium hover:underline">
+          playlists.map((p) => (
+            <div key={p.id} className={row}>
+              <Cover url={p.cover_url} size={44} radius={6} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">
+                  <Link href={`/biblioteca/${p.id}`} className="hover:underline">
                     {p.name}
-                  </Link>
-                  <p className="text-xs text-stone-500">
-                    {SOURCE_LABEL[p.source] ?? p.source} · {p.total} canciones · {p.synced} sincronizadas · {p.plain} sin
-                    tiempos · {p.instrumental} instrumentales · {p.not_found + p.error} sin letra
-                    {p.pending > 0 && ` · ${p.pending} pendientes`}
-                  </p>
-                  <p className="text-xs text-stone-500">
-                    Spotify: {p.spotify_matched}/{p.total} vinculadas
-                    {p.spotify_not_found > 0 && ` · ${p.spotify_not_found} no están en Spotify`}
-                  </p>
+                  </Link>{" "}
+                  <span className="font-normal text-secondary">· {SOURCE_LABEL[p.source] ?? p.source}</span>
                 </div>
-                <PlaylistActions
-                  playlistId={p.id}
-                  retryable={p.not_found + p.error + p.pending}
-                  unlinked={p.total - p.spotify_matched}
-                />
-              </li>
-            ))}
-          </ul>
+                <div className="truncate text-[13px] text-snippet">
+                  {p.total} canciones · {p.synced} sincronizadas · {p.plain} sin tiempos · {p.not_found + p.error} sin letra ·{" "}
+                  {p.spotify_matched} en Spotify
+                  {p.pending > 0 && ` · ${p.pending} pendientes`}
+                </div>
+              </div>
+              <PlaylistActions playlistId={p.id} retryable={p.not_found + p.error + p.pending} unlinked={p.total - p.spotify_matched} />
+            </div>
+          ))
         )}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">Canciones sin letra ({missing.length})</h2>
-        {missing.length === 0 ? (
-          <p className="text-sm text-stone-600">Todas las canciones tienen letra o son instrumentales.</p>
+      <section className="flex min-h-0 flex-1 flex-col">
+        <h2 className="border-b border-hairline pb-3 text-[17px] font-semibold">Canciones sin letra ({missing.total})</h2>
+        {missing.total === 0 ? (
+          <p className="pt-5 text-sm text-secondary">Todas las canciones tienen letra o son instrumentales.</p>
         ) : (
-          <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white shadow-sm">
-            {missing.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <Link href={`/cancion/${t.id}`} className="min-w-0 truncate hover:underline">
-                  <span className="font-medium">{t.title}</span> <span className="text-stone-500">— {t.artist}</span>
-                </Link>
-                <div className="flex shrink-0 items-center gap-2">
-                  <StatusBadge status={t.lyrics_status} />
-                  <Link href={`/cancion/${t.id}`} className="text-xs text-emerald-700 hover:underline">
-                    Pegar letra
-                  </Link>
+          missing.items.map((t) => (
+            <div key={t.id} className={row}>
+              <Cover url={t.cover_url} size={44} radius={6} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">
+                  <Link href={`/cancion/${t.id}`} className="hover:underline">
+                    {t.title}
+                  </Link>{" "}
+                  <span className="font-normal text-secondary">· {t.artist}</span>
                 </div>
-              </li>
-            ))}
-          </ul>
+                <LyricsStatusDot status={t.lyrics_status} />
+              </div>
+              <Link href={`/cancion/${t.id}`} className="text-[13px] font-semibold text-accent hover:underline">
+                Pegar letra
+              </Link>
+            </div>
+          ))
         )}
+        <Pagination page={missing.page} pages={missing.pages} href={(n) => pageHref("/biblioteca", {}, n)} />
       </section>
     </div>
   );

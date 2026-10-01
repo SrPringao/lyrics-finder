@@ -1,16 +1,31 @@
 // Tipos mínimos del Web Playback SDK (https://sdk.scdn.co/spotify-player.js)
 declare namespace Spotify {
+  interface SdkTrack {
+    id: string | null;
+    uri: string;
+    name: string;
+    duration_ms: number;
+    artists: { name: string }[];
+    album: { name: string; images: { url: string; width?: number | null; height?: number | null }[] };
+    linked_from?: { uri: string | null; id: string | null };
+  }
   interface PlaybackState {
     paused: boolean;
     position: number;
     duration: number;
-    track_window: { current_track: { name: string; uri: string; artists: { name: string }[] } };
+    timestamp?: number;
+    track_window: { current_track: SdkTrack };
   }
   interface Player {
     connect(): Promise<boolean>;
     disconnect(): void;
     activateElement(): Promise<void>;
     togglePlay(): Promise<void>;
+    pause(): Promise<void>;
+    resume(): Promise<void>;
+    seek(positionMs: number): Promise<void>;
+    setVolume(volume: number): Promise<void>;
+    getCurrentState(): Promise<PlaybackState | null>;
     addListener(event: "ready" | "not_ready", cb: (e: { device_id: string }) => void): boolean;
     addListener(event: "player_state_changed", cb: (s: PlaybackState | null) => void): boolean;
     addListener(

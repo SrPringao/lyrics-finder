@@ -24,6 +24,7 @@ export interface TrackRow {
   apple_id: string | null;
   spotify_status: "matched" | "not_found" | null;
   spotify_matched_via: "export" | "isrc" | "search" | null;
+  cover_url: string | null;
 }
 
 export interface LineRow {
@@ -47,6 +48,7 @@ export interface PlaylistSummary {
   pending: number;
   spotify_matched: number;
   spotify_not_found: number;
+  cover_url: string | null;
 }
 
 /** Estados que todavía vale la pena consultar en LRCLIB. */
@@ -202,7 +204,9 @@ const SUMMARY_COLUMNS = `
   COALESCE(SUM(t.lyrics_status = 'error'), 0)        AS error,
   COALESCE(SUM(t.lyrics_status = 'pending'), 0)      AS pending,
   COALESCE(SUM(t.spotify_status = 'matched'), 0)     AS spotify_matched,
-  COALESCE(SUM(t.spotify_status = 'not_found'), 0)   AS spotify_not_found`;
+  COALESCE(SUM(t.spotify_status = 'not_found'), 0)   AS spotify_not_found,
+  (SELECT t2.cover_url FROM playlist_tracks pt2 JOIN tracks t2 ON t2.id = pt2.track_id
+   WHERE pt2.playlist_id = p.id AND t2.cover_url IS NOT NULL ORDER BY pt2.position LIMIT 1) AS cover_url`;
 
 // Una canción repetida en la misma playlist se cuenta una vez.
 const SUMMARY_FROM = `
@@ -220,19 +224,85 @@ export function listPlaylists(db: DB): PlaylistSummary[] {
   return db.prepare(`SELECT ${SUMMARY_COLUMNS} ${SUMMARY_FROM} GROUP BY p.id ORDER BY p.created_at DESC, p.id DESC`).all() as PlaylistSummary[];
 }
 
-export function getPlaylistTracks(db: DB, playlistId: number): (TrackRow & { position: number })[] {
-  return db
-    .prepare(
-      `SELECT t.*, pt.position FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
-       WHERE pt.playlist_id = ? ORDER BY pt.position`,
-    )
-    .all(playlistId) as (TrackRow & { position: number })[];
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pages: number;
 }
 
-export function listTracksWithoutLyrics(db: DB): TrackRow[] {
-  return db
-    .prepare("SELECT * FROM tracks WHERE lyrics_status IN ('not_found','error') ORDER BY artist, title")
-    .all() as TrackRow[];
+export function pageParams(raw: unknown, perPage: number, total: number): { page: number; pages: number; offset: number } {
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const n = Math.floor(Number(raw));
+  const page = Number.isFinite(n) ? Math.min(Math.max(1, n), pages) : 1;
+  return { page, pages, offset: (page - 1) * perPage };
+}
+
+export function getPlaylistTracks(db: DB, playlistId: number): (TrackRow & { position: number })[];
+export function getPlaylistTracks(db: DB, playlistId: number, page: unknown, perPage: number): Page<TrackRow & { position: number }>;
+export function getPlaylistTracks(db: DB, playlistId: number, page?: unknown, perPage?: number) {
+  const sql = `SELECT t.*, pt.position FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
+               WHERE pt.playlist_id = ? ORDER BY pt.position`;
+  if (perPage === undefined) return db.prepare(sql).all(playlistId) as (TrackRow & { position: number })[];
+  const total = (db.prepare("SELECT COUNT(*) c FROM playlist_tracks WHERE playlist_id = ?").get(playlistId) as { c: number }).c;
+  const p = pageParams(page, perPage, total);
+  const items = db.prepare(`${sql} LIMIT ? OFFSET ?`).all(playlistId, perPage, p.offset) as (TrackRow & { position: number })[];
+  return { items, total, page: p.page, pages: p.pages };
+}
+
+const WITHOUT_LYRICS = "lyrics_status IN ('not_found','error')";
+
+export function listTracksWithoutLyrics(db: DB): TrackRow[];
+export function listTracksWithoutLyrics(db: DB, page: unknown, perPage: number): Page<TrackRow>;
+export function listTracksWithoutLyrics(db: DB, page?: unknown, perPage?: number) {
+  const sql = `SELECT * FROM tracks WHERE ${WITHOUT_LYRICS} ORDER BY artist, title`;
+  if (perPage === undefined) return db.prepare(sql).all() as TrackRow[];
+  const total = (db.prepare(`SELECT COUNT(*) c FROM tracks WHERE ${WITHOUT_LYRICS}`).get() as { c: number }).c;
+  const p = pageParams(page, perPage, total);
+  const items = db.prepare(`${sql} LIMIT ? OFFSET ?`).all(perPage, p.offset) as TrackRow[];
+  return { items, total, page: p.page, pages: p.pages };
+}
+
+/** Lo que necesita el panel "Ahora suena" de una canción. */
+export interface TrackPayload {
+  id: number;
+  title: string;
+  artist: string;
+  album: string | null;
+  durationMs: number | null;
+  spotifyUri: string | null;
+  coverUrl: string | null;
+  lyricsStatus: TrackStatus;
+  lines: { i: number; t: number | null; text: string }[];
+}
+
+export function getTrackPayload(db: DB, id: number): TrackPayload | null {
+  const t = getTrack(db, id);
+  if (!t) return null;
+  return {
+    id: t.id,
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    durationMs: t.duration_sec != null ? t.duration_sec * 1000 : null,
+    spotifyUri: t.spotify_uri,
+    coverUrl: t.cover_url,
+    lyricsStatus: t.lyrics_status,
+    lines: getTrackLines(db, id).map((l) => ({ i: l.line_index, t: l.time_ms, text: l.text })),
+  };
+}
+
+export function findTrackIdByUri(db: DB, uris: string[]): number | null {
+  for (const uri of uris) {
+    const row = db.prepare("SELECT id FROM tracks WHERE spotify_uri = ? LIMIT 1").get(uri) as { id: number } | undefined;
+    if (row) return row.id;
+  }
+  return null;
+}
+
+/** Guarda la portada si aún no hay una. */
+export function setCoverIfMissing(db: DB, trackId: number, url: string): boolean {
+  return db.prepare("UPDATE tracks SET cover_url = ? WHERE id = ? AND cover_url IS NULL").run(url, trackId).changes > 0;
 }
 
 export function getTrack(db: DB, id: number): TrackRow | undefined {

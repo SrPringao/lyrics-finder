@@ -16,8 +16,8 @@ export default async function SpotifyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Conectar Spotify</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="text-[30px] font-bold tracking-[-0.03em]">Conectar Spotify</h1>
+        <p className="mt-1 text-sm text-secondary">
           Al conectar tu cuenta (Premium), cada tiempo de la letra se vuelve un botón que reproduce la canción desde ese
           segundo.
         </p>

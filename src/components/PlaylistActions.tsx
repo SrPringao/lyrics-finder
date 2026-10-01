@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSpotify } from "@/components/spotify/SpotifyProvider";
 
+const textBtn = "border-0 bg-transparent p-0 text-[13px] font-semibold text-accent hover:underline";
+
 export function PlaylistActions({
   playlistId,
   retryable,
@@ -27,7 +29,6 @@ export function PlaylistActions({
       setMsg((await res.json()).error ?? "Error");
       return;
     }
-    // Refresca un par de veces mientras avanza; la página completa también se puede recargar.
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1500));
       const p = await (await fetch(`/api/playlists/${playlistId}`, { cache: "no-store" })).json();
@@ -49,32 +50,32 @@ export function PlaylistActions({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
       {status?.connected && !status.searchBlockedUntil && unlinked > 0 && (
-        <button onClick={() => retry("spotify")} className="rounded-md border border-stone-300 bg-white px-2.5 py-1 hover:bg-stone-50">
+        <button type="button" onClick={() => retry("spotify")} className={textBtn}>
           Vincular {unlinked} con Spotify
         </button>
       )}
       {retryable > 0 && (
-        <button onClick={() => retry("fetch")} className="rounded-md border border-stone-300 bg-white px-2.5 py-1 hover:bg-stone-50">
+        <button type="button" onClick={() => retry("fetch")} className={textBtn}>
           Reintentar {retryable} sin letra
         </button>
       )}
       {confirming ? (
         <>
-          <button onClick={remove} className="rounded-md bg-red-600 px-2.5 py-1 text-white hover:bg-red-700">
+          <button type="button" onClick={remove} className={`${textBtn} text-warn`}>
             Sí, borrar
           </button>
-          <button onClick={() => setConfirming(false)} className="rounded-md border border-stone-300 bg-white px-2.5 py-1">
+          <button type="button" onClick={() => setConfirming(false)} className={`${textBtn} text-secondary`}>
             Cancelar
           </button>
         </>
       ) : (
-        <button onClick={() => setConfirming(true)} className="rounded-md border border-stone-300 bg-white px-2.5 py-1 text-red-700 hover:bg-red-50">
+        <button type="button" onClick={() => setConfirming(true)} className={`${textBtn} text-warn`}>
           Borrar
         </button>
       )}
-      {msg && <span className="text-stone-500">{msg}</span>}
+      {msg && <span className="text-xs text-secondary">{msg}</span>}
     </div>
   );
 }

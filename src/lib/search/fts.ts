@@ -53,6 +53,8 @@ export interface LineHit {
   lineId: number;
   lineIndex: number;
   timeMs: number | null;
+  /** Relevancia de FTS5 (menor = mejor). */
+  rank: number;
   /** Texto con las coincidencias marcadas entre HL_START y HL_END. */
   highlighted: string;
   before: string | null;
@@ -66,6 +68,7 @@ export interface TrackHits {
   album: string | null;
   spotifyUri: string | null;
   spotifyStatus: string | null;
+  coverUrl: string | null;
   lyricsStatus: string;
   hits: LineHit[];
 }
@@ -103,7 +106,7 @@ export function searchLyrics(
       `SELECT ll.id AS lineId, ll.track_id AS trackId, ll.line_index AS lineIndex, ll.time_ms AS timeMs,
               highlight(${fts}, 0, @hs, @he) AS highlighted,
               prev.text AS before, next.text AS after,
-              t.title, t.artist, t.album, t.spotify_uri AS spotifyUri, t.spotify_status AS spotifyStatus, t.lyrics_status AS lyricsStatus,
+              t.title, t.artist, t.album, t.spotify_uri AS spotifyUri, t.spotify_status AS spotifyStatus, t.cover_url AS coverUrl, t.lyrics_status AS lyricsStatus,
               ${fts}.rank AS rank
        FROM ${fts}
        JOIN lyric_lines ll ON ll.id = ${fts}.rowid
@@ -129,6 +132,7 @@ export function searchLyrics(
         album: r.album,
         spotifyUri: r.spotifyUri,
         spotifyStatus: r.spotifyStatus,
+        coverUrl: r.coverUrl,
         lyricsStatus: r.lyricsStatus,
         hits: [],
         bestRank: r.rank,
@@ -139,6 +143,7 @@ export function searchLyrics(
       lineId: r.lineId,
       lineIndex: r.lineIndex,
       timeMs: r.timeMs,
+      rank: r.rank,
       highlighted: r.highlighted,
       before: r.before,
       after: r.after,
@@ -155,6 +160,7 @@ export function searchLyrics(
       album: t.album,
       spotifyUri: t.spotifyUri,
       spotifyStatus: t.spotifyStatus,
+      coverUrl: t.coverUrl,
       lyricsStatus: t.lyricsStatus,
       hits: t.hits.sort((a, b) => a.lineIndex - b.lineIndex),
     }));

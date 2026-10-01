@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import { SpotifyBar } from "@/components/spotify/SpotifyBar";
+import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
+import { Toast } from "@/components/player/Toast";
+import { SiteHeader } from "@/components/SiteHeader";
 import { SpotifyProvider } from "@/components/spotify/SpotifyProvider";
 import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Letras de mis playlists",
@@ -15,25 +13,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
+    <html lang="es" className="h-full antialiased">
+      <body className="h-full bg-white text-ink">
         <SpotifyProvider>
-        <header className="border-b border-stone-200 bg-white/80 backdrop-blur sticky top-0 z-10">
-          <nav className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-            <Link href="/" className="font-semibold tracking-tight">
-              Letras
-            </Link>
-            <div className="flex gap-4 text-sm text-stone-600">
-              <Link href="/buscar" className="hover:text-stone-900">Buscar</Link>
-              <Link href="/importar" className="hover:text-stone-900">Importar</Link>
-              <Link href="/biblioteca" className="hover:text-stone-900">Biblioteca</Link>
+          <div className="lg:grid lg:h-dvh lg:grid-cols-[minmax(0,1fr)_480px] lg:overflow-hidden">
+            {/* Contenido: ocupa toda la altura; la lista crece y la paginación queda abajo. */}
+            <div className="flex min-h-dvh min-w-0 flex-col px-4 pb-[96px] lg:h-dvh lg:min-h-0 lg:overflow-y-auto lg:px-[44px] lg:pb-6">
+              <SiteHeader />
+              <main className="flex min-h-0 flex-1 flex-col">{children}</main>
             </div>
-            <div className="ml-auto">
-              <SpotifyBar />
-            </div>
-          </nav>
-        </header>
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">{children}</main>
+            <aside aria-label="Ahora suena" className="hidden lg:block lg:h-dvh lg:min-h-0">
+              <NowPlayingPanel />
+            </aside>
+          </div>
+          <MiniPlayer />
+          <Toast />
         </SpotifyProvider>
       </body>
     </html>

@@ -141,6 +141,10 @@ const MIGRATIONS: string[] = [
   -- Indexa las letras que ya estaban guardadas.
   INSERT INTO lyric_lines_tri(lyric_lines_tri) VALUES ('rebuild');
   `,
+  // v5: portada del álbum (Spotify la da al vincular o al reproducir).
+  `
+  ALTER TABLE tracks ADD COLUMN cover_url TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

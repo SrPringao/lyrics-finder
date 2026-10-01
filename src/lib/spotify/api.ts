@@ -10,9 +10,33 @@ export interface SpotifyTrack {
   name: string;
   duration_ms: number;
   artists: { name: string }[];
-  album: { name: string };
+  album: { name: string; images?: SpotifyImage[] };
+  linked_from?: { uri: string } | null;
   external_ids?: { isrc?: string };
   is_playable?: boolean;
+}
+
+export interface SpotifyImage {
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+/** La imagen más cercana a 300 px (Spotify da 640, 300 y 64). */
+export function pickCover(images: SpotifyImage[] | undefined | null): string | null {
+  if (!images?.length) return null;
+  const sorted = [...images].sort((a, b) => Math.abs((a.width ?? 300) - 300) - Math.abs((b.width ?? 300) - 300));
+  return sorted[0].url;
+}
+
+/** Solo se aceptan portadas del CDN de imágenes de Spotify. */
+export function isSpotifyImageUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname === "i.scdn.co" || u.hostname.endsWith(".scdn.co") || u.hostname.endsWith(".spotifycdn.com"));
+  } catch {
+    return false;
+  }
 }
 
 export interface SpotifyDevice {
@@ -119,6 +143,14 @@ export async function spotifyFetch(db: DB, path: string, init: RequestInit = {},
 
 export async function getProfile(token: string, fetchImpl: typeof fetch = fetch) {
   const res = await fetchImpl(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 403) {
+    // Modo desarrollo: Spotify deja aceptar el login, pero rechaza a cuentas que no están en la lista.
+    throw new SpotifyApiError(
+      403,
+      "USER_NOT_REGISTERED",
+      "Spotify no permite esta cuenta en la app todavía. El dueño de la app debe agregar el correo de esta cuenta de Spotify en developer.spotify.com/dashboard → la app → User Management (máximo 5 cuentas). Después vuelve a conectar.",
+    );
+  }
   if (!res.ok) throw new SpotifyApiError(res.status, null, `No pude leer el perfil de Spotify (${res.status})`);
   return (await res.json()) as { id: string; display_name: string | null; product: string | null };
 }
@@ -172,6 +204,72 @@ export async function searchByText(
 export async function getDevices(db: DB, opts: ApiOptions = {}): Promise<SpotifyDevice[]> {
   const res = await spotifyFetch(db, "/me/player/devices", {}, opts);
   return ((await res.json()) as { devices: SpotifyDevice[] }).devices;
+}
+
+export interface RemotePlayerState {
+  isPlaying: boolean;
+  progressMs: number;
+  /** Momento (epoch ms) en que Spotify midió progressMs. */
+  timestamp: number;
+  deviceId: string | null;
+  volumePercent: number | null;
+  item: { uri: string; linkedFromUri: string | null; name: string; artists: string; durationMs: number; coverUrl: string | null } | null;
+}
+
+/** Estado del reproductor en cualquier dispositivo (para cuando no suena en este navegador). */
+export async function getPlayerState(db: DB, opts: ApiOptions = {}): Promise<RemotePlayerState | null> {
+  const res = await spotifyFetch(db, "/me/player?additional_types=track", {}, opts);
+  if (res.status === 204) return null;
+  const data = (await res.json().catch(() => null)) as {
+    is_playing: boolean;
+    progress_ms: number | null;
+    timestamp: number;
+    device?: { id: string | null; volume_percent: number | null };
+    item?: SpotifyTrack | null;
+  } | null;
+  if (!data) return null;
+  const item = data.item ?? null;
+  return {
+    isPlaying: data.is_playing,
+    progressMs: data.progress_ms ?? 0,
+    timestamp: Date.now(),
+    deviceId: data.device?.id ?? null,
+    volumePercent: data.device?.volume_percent ?? null,
+    item: item
+      ? {
+          uri: item.uri,
+          linkedFromUri: item.linked_from?.uri ?? null,
+          name: item.name,
+          artists: item.artists.map((a) => a.name).join(", "),
+          durationMs: item.duration_ms,
+          coverUrl: pickCover(item.album?.images),
+        }
+      : null,
+  };
+}
+
+export type ControlAction =
+  | { action: "pause" }
+  | { action: "resume" }
+  | { action: "seek"; positionMs: number }
+  | { action: "volume"; volumePercent: number };
+
+/** Controla la reproducción en otro dispositivo (celular, app de escritorio…). */
+export async function controlPlayback(db: DB, c: ControlAction & { deviceId?: string | null }, opts: ApiOptions = {}): Promise<void> {
+  const qs = new URLSearchParams();
+  if (c.deviceId) qs.set("device_id", c.deviceId);
+  let path: string;
+  if (c.action === "pause") path = "/me/player/pause";
+  else if (c.action === "resume") path = "/me/player/play";
+  else if (c.action === "seek") {
+    qs.set("position_ms", String(Math.max(0, Math.round(c.positionMs))));
+    path = "/me/player/seek";
+  } else {
+    qs.set("volume_percent", String(Math.min(100, Math.max(0, Math.round(c.volumePercent)))));
+    path = "/me/player/volume";
+  }
+  const q = qs.toString();
+  await spotifyFetch(db, `${path}${q ? `?${q}` : ""}`, { method: "PUT" }, opts);
 }
 
 export async function playTrack(

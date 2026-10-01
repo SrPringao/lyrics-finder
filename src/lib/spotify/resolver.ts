@@ -7,6 +7,7 @@ import {
   searchByText,
   SpotifyApiError,
   type ApiOptions,
+  pickCover,
   type SpotifyTrack,
 } from "@/lib/spotify/api";
 import { getAuth, SpotifyNotConnectedError } from "@/lib/spotify/auth";
@@ -28,6 +29,7 @@ function saveMatch(db: DB, trackId: number, t: SpotifyTrack, via: "isrc" | "sear
   db.prepare(
     `UPDATE tracks SET spotify_uri = @uri, spotify_status = 'matched', spotify_matched_via = @via,
        duration_sec = COALESCE(duration_sec, @duration),
+       cover_url = COALESCE(@cover, cover_url),
        isrc = COALESCE(isrc, @isrc),
        -- Con ISRC es la grabación exacta: el primer artista de Spotify es más confiable para buscar letras.
        primary_artist = CASE WHEN @via = 'isrc' THEN @primary ELSE primary_artist END
@@ -39,6 +41,7 @@ function saveMatch(db: DB, trackId: number, t: SpotifyTrack, via: "isrc" | "sear
     duration: Math.round(t.duration_ms / 1000),
     isrc: t.external_ids?.isrc ?? null,
     primary: t.artists[0]?.name ?? null,
+    cover: pickCover(t.album?.images),
   });
 }
 
