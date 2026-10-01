@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { PlaylistActions } from "@/components/PlaylistActions";
 import { PlayButton } from "@/components/spotify/PlayButton";
+import { SpotifyLinkPill } from "@/components/SpotifyLinkPill";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getDb } from "@/lib/db";
 import { getPlaylistSummary, getPlaylistTracks } from "@/lib/db/repo";
@@ -53,13 +54,8 @@ export default async function PlaylistPage({ params }: PageProps<"/biblioteca/[i
               {t.duration_sec != null ? formatTime(t.duration_sec * 1000) : ""}
             </span>
             <StatusBadge status={t.lyrics_status} manual={t.lyrics_source === "manual"} />
-            {t.spotify_status === "not_found" ? (
-              <span className="text-xs text-stone-400" title="No se encontró en Spotify">
-                sin Spotify
-              </span>
-            ) : (
-              <PlayButton trackId={t.id} timeMs={null} label="" />
-            )}
+            <SpotifyLinkPill status={t.spotify_status} uri={t.spotify_uri} />
+            {t.spotify_status !== "not_found" && <PlayButton trackId={t.id} timeMs={null} label="" />}
           </li>
         ))}
       </ol>

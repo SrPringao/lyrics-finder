@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Highlighted } from "@/components/Highlighted";
 import { SpotifyButton } from "@/components/SpotifyButton";
+import { SpotifyLinkPill } from "@/components/SpotifyLinkPill";
 import { PlayButton } from "@/components/spotify/PlayButton";
 import { getDb } from "@/lib/db";
 import { listPlaylists } from "@/lib/db/repo";
@@ -110,7 +111,8 @@ export default async function BuscarPage({ searchParams }: PageProps<"/buscar">)
                       {t.album && <span className="text-stone-400"> · {t.album}</span>}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SpotifyLinkPill status={t.spotifyStatus} uri={t.spotifyUri} />
                     <span className="text-xs text-stone-500">
                       {t.hits.length} {t.hits.length === 1 ? "mención" : "menciones"}
                     </span>

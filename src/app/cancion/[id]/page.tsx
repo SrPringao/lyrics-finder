@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { LyricsEditor } from "@/components/LyricsEditor";
 import { SpotifyButton } from "@/components/SpotifyButton";
+import { SpotifyLinkPill } from "@/components/SpotifyLinkPill";
 import { PlayButton } from "@/components/spotify/PlayButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getDb } from "@/lib/db";
@@ -31,6 +32,7 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
             <StatusBadge status={track.lyrics_status} manual={track.lyrics_source === "manual"} />
+            <SpotifyLinkPill status={track.spotify_status} uri={track.spotify_uri} />
             {playlists.map((p) => (
               <Link key={p.id} href={`/biblioteca/${p.id}`} className="rounded-full border border-stone-200 px-2 py-0.5 hover:bg-stone-50">
                 {p.name}

@@ -16,16 +16,18 @@ export async function POST(req: Request) {
   if (!track) return Response.json({ error: "Canción no encontrada." }, { status: 404 });
 
   try {
+    const newlyLinked = !track.spotify_uri;
     const uri = track.spotify_uri ?? (await spotifyLimiter.run(() => resolveTrack(db, track)));
     if (!uri) {
+      // Quedó marcada como "No está en Spotify": la UI refresca la etiqueta.
       return Response.json(
         { error: "No encontré esta canción en Spotify. Prueba con “Abrir en Spotify”, que la busca por nombre.", code: "not_on_spotify" },
-        { status: 404 },
+        { status: 404, headers: { "x-track-updated": "1" } },
       );
     }
     const positionMs = body.timeMs != null ? Math.max(0, body.timeMs - PREROLL_MS) : 0;
     await playTrack(db, { uri, positionMs, deviceId: body.deviceId ?? null });
-    return Response.json({ ok: true, uri, positionMs });
+    return Response.json({ ok: true, uri, positionMs, newlyLinked });
   } catch (err) {
     return spotifyErrorResponse(err);
   }

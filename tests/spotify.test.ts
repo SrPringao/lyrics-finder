@@ -87,7 +87,7 @@ describe("migración v1 → v2", () => {
 
     const db = openDb(file);
     expect(db.pragma("user_version", { simple: true })).toBe(SCHEMA_VERSION);
-    expect(existsSync(path.join(dir, "app.backup-v1.db"))).toBe(true);
+    expect(existsSync(path.join(dir, "backups", "app.backup-v1.db"))).toBe(true);
     const t = getTrack(db, old.trackId)!;
     expect(t).toMatchObject({ title: "Vieja", lyrics_status: "synced", spotify_status: "matched", spotify_matched_via: "export", isrc: null });
     const hits = db.prepare("SELECT COUNT(*) c FROM lyric_lines_fts WHERE lyric_lines_fts MATCH 'inventada'").get() as { c: number };

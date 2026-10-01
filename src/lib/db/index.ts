@@ -150,7 +150,9 @@ export function migrate(db: DB, target = MIGRATIONS.length): void {
   if (current >= target) return;
   // Antes de cambiar una base con datos, deja un respaldo junto al archivo original.
   if (current > 0 && db.name !== ":memory:") {
-    const backup = db.name.replace(/\.db$/, "") + `.backup-v${current}.db`;
+    const dir = path.join(path.dirname(db.name), "backups");
+    mkdirSync(dir, { recursive: true });
+    const backup = path.join(dir, `${path.basename(db.name, ".db")}.backup-v${current}.db`);
     if (!existsSync(backup)) db.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`);
   }
   for (let v = current; v < target; v++) {

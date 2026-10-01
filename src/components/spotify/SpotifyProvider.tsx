@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 export const BROWSER_DEVICE = "browser";
@@ -49,6 +50,7 @@ function readStored(): string {
 }
 
 export function SpotifyProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
   const [browserDeviceId, setBrowserDeviceId] = useState<string | null>(null);
   const [sdkError, setSdkError] = useState<string | null>(null);
@@ -156,13 +158,15 @@ export function SpotifyProvider({ children }: { children: React.ReactNode }) {
         });
         const data = await res.json();
         if (!res.ok) flash(data.error ?? "No se pudo reproducir", true);
+        // La canción se acaba de vincular (o se marcó como no disponible): refresca las etiquetas.
+        if (data.newlyLinked || res.headers.get("x-track-updated")) router.refresh();
       } catch (err) {
         flash(err instanceof Error ? err.message : String(err), true);
       } finally {
         setPlayingKey(null);
       }
     },
-    [selectedDevice, browserDeviceId, sdkError, flash],
+    [selectedDevice, browserDeviceId, sdkError, flash, router],
   );
 
   const togglePause = useCallback(async () => {

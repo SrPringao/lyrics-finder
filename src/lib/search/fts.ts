@@ -65,6 +65,7 @@ export interface TrackHits {
   artist: string;
   album: string | null;
   spotifyUri: string | null;
+  spotifyStatus: string | null;
   lyricsStatus: string;
   hits: LineHit[];
 }
@@ -102,7 +103,7 @@ export function searchLyrics(
       `SELECT ll.id AS lineId, ll.track_id AS trackId, ll.line_index AS lineIndex, ll.time_ms AS timeMs,
               highlight(${fts}, 0, @hs, @he) AS highlighted,
               prev.text AS before, next.text AS after,
-              t.title, t.artist, t.album, t.spotify_uri AS spotifyUri, t.lyrics_status AS lyricsStatus,
+              t.title, t.artist, t.album, t.spotify_uri AS spotifyUri, t.spotify_status AS spotifyStatus, t.lyrics_status AS lyricsStatus,
               ${fts}.rank AS rank
        FROM ${fts}
        JOIN lyric_lines ll ON ll.id = ${fts}.rowid
@@ -127,6 +128,7 @@ export function searchLyrics(
         artist: r.artist,
         album: r.album,
         spotifyUri: r.spotifyUri,
+        spotifyStatus: r.spotifyStatus,
         lyricsStatus: r.lyricsStatus,
         hits: [],
         bestRank: r.rank,
@@ -152,6 +154,7 @@ export function searchLyrics(
       artist: t.artist,
       album: t.album,
       spotifyUri: t.spotifyUri,
+      spotifyStatus: t.spotifyStatus,
       lyricsStatus: t.lyricsStatus,
       hits: t.hits.sort((a, b) => a.lineIndex - b.lineIndex),
     }));
