@@ -14,7 +14,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className="h-full antialiased">
-      <body className="h-full bg-white text-ink">
+      {/* Extensiones como ColorZilla agregan atributos al <body> antes de hidratar (cz-shortcut-listen). */}
+      <body className="h-full bg-white text-ink" suppressHydrationWarning>
         <SpotifyProvider>
           <div className="lg:grid lg:h-dvh lg:grid-cols-[minmax(0,1fr)_480px] lg:overflow-hidden">
             {/* Contenido: ocupa toda la altura; la lista crece y la paginación queda abajo. */}
