@@ -1,25 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-
-interface Progress {
-  id: number;
-  name: string;
-  total: number;
-  synced: number;
-  plain: number;
-  instrumental: number;
-  not_found: number;
-  error: number;
-  pending: number;
-  spotify_matched: number;
-  spotify_not_found: number;
-  running: boolean;
-  phase: "spotify" | "lyrics" | null;
-}
-
-const SOURCE_LABEL: Record<string, string> = { spotify: "Spotify", apple: "Apple Music", csv: "CSV" };
+import { useRef, useState } from "react";
+import { ImportProgress, type ImportInfo } from "@/components/ImportProgress";
 
 export function ImportForm() {
   const [file, setFile] = useState<File | null>(null);
@@ -27,15 +9,7 @@ export function ImportForm() {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<{
-    playlistId: number;
-    name: string;
-    trackCount: number;
-    source: string;
-    skipped: number;
-    withIsrc: number;
-  } | null>(null);
-  const [progress, setProgress] = useState<Progress | null>(null);
+  const [info, setInfo] = useState<ImportInfo | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function pick(f: File | undefined) {
@@ -50,7 +24,7 @@ export function ImportForm() {
     if (!file) return;
     setBusy(true);
     setError(null);
-    setProgress(null);
+    setInfo(null);
     const fd = new FormData();
     fd.set("file", file);
     fd.set("name", name);
@@ -64,37 +38,6 @@ export function ImportForm() {
       setBusy(false);
     }
   }
-
-  // Polling del progreso cada segundo hasta que no quede nada pendiente.
-  useEffect(() => {
-    if (!info) return;
-    let stop = false;
-    async function tick() {
-      try {
-        const res = await fetch(`/api/playlists/${info!.playlistId}`, { cache: "no-store" });
-        if (res.ok) {
-          const p: Progress = await res.json();
-          if (stop) return;
-          setProgress(p);
-          if (!p.running && p.pending === 0) {
-            setBusy(false);
-            return;
-          }
-        }
-      } catch {
-        // seguimos intentando
-      }
-      if (!stop) setTimeout(tick, 1000);
-    }
-    tick();
-    return () => {
-      stop = true;
-    };
-  }, [info]);
-
-  const done = progress ? progress.total - progress.pending : 0;
-  const pct = progress && progress.total ? Math.round((done / progress.total) * 100) : 0;
-  const finished = progress && !progress.running && progress.pending === 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -170,51 +113,7 @@ export function ImportForm() {
         </button>
       </form>
 
-      {info && (
-        <section className="flex flex-col gap-3 border-t border-hairline pt-6">
-          <p className="text-[13px] text-secondary">
-            <span className="font-semibold text-ink">{info.name}</span>: {info.trackCount} canciones leídas ({SOURCE_LABEL[info.source] ?? info.source})
-            {info.withIsrc > 0 && ` · ${info.withIsrc} con ISRC`}
-            {info.skipped > 0 && ` · ${info.skipped} filas sin título ignoradas`}
-          </p>
-          {progress && (
-            <>
-              {progress.phase === "spotify" && (
-                <p className="text-[13px] text-secondary">
-                  Vinculando con Spotify: {progress.spotify_matched + progress.spotify_not_found}/{progress.total}… (después
-                  siguen las letras)
-                </p>
-              )}
-              <div className="h-1 overflow-hidden rounded-[4px] bg-pill">
-                <div className="h-1 rounded-[4px] bg-accent transition-all duration-500" style={{ width: `${pct}%` }} />
-              </div>
-              <p className="text-[13px] text-secondary">
-                <span className="font-semibold text-ink">
-                  Letras: {done}/{progress.total}
-                </span>{" "}
-                — {progress.synced} sincronizadas, {progress.plain} sin tiempos, {progress.instrumental} instrumentales,{" "}
-                {progress.not_found} no encontradas
-                {progress.error > 0 && `, ${progress.error} con error`}
-              </p>
-              {progress.spotify_matched + progress.spotify_not_found > 0 && (
-                <p className="text-[13px] text-secondary">
-                  Spotify: {progress.spotify_matched} vinculadas, {progress.spotify_not_found} no encontradas
-                </p>
-              )}
-              {finished && (
-                <div className="flex flex-wrap gap-2 pt-2 text-[13px]">
-                  <Link href="/buscar" className="rounded-full bg-ink px-[13px] py-1.5 text-white">
-                    Buscar en las letras
-                  </Link>
-                  <Link href={`/biblioteca/${info.playlistId}`} className="rounded-full bg-pill px-[13px] py-1.5 text-ink hover:bg-hairline">
-                    Ver canciones
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
+      {info && <ImportProgress key={info.playlistId} info={info} onDone={() => setBusy(false)} />}
     </div>
   );
 }

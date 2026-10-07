@@ -44,7 +44,7 @@ export default async function BuscarPage({ searchParams }: PageProps<"/buscar">)
       : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <SearchBar
         key={`${q}|${mode}|${playlistId ?? ""}`}
         q={q}
@@ -65,8 +65,9 @@ export default async function BuscarPage({ searchParams }: PageProps<"/buscar">)
           </p>
         ) : !result ? (
           <p className="pt-5 text-sm leading-relaxed text-secondary">
-            No importan mayúsculas ni acentos. Usa comillas para frases exactas. Con “Contiene el texto” puedes escribir solo
-            una parte de la palabra (mínimo {MIN_CONTAINS_LENGTH} letras).
+            No importan mayúsculas ni acentos. Varias palabras se buscan juntas, como frase; para buscarlas en cualquier
+            parte de la línea, ponlas entre comillas por separado (“me” “cocina”). Con “Contiene el texto” puedes escribir
+            solo una parte de la palabra (mínimo {MIN_CONTAINS_LENGTH} letras).
           </p>
         ) : (
           <>

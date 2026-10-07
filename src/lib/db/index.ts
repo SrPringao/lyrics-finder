@@ -145,6 +145,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE tracks ADD COLUMN cover_url TEXT;
   `,
+  // v6: canciones que el usuario ocultó porque sabe que nunca tendrán letra.
+  `
+  ALTER TABLE tracks ADD COLUMN lyrics_ignored INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

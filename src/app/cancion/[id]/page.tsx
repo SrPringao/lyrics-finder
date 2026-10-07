@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Cover } from "@/components/Cover";
+import { IgnoreLyricsButton } from "@/components/IgnoreLyricsButton";
 import { LyricsEditor } from "@/components/LyricsEditor";
 import { LyricsFull } from "@/components/song/LyricsFull";
 import { PlayButton } from "@/components/spotify/PlayButton";
@@ -32,7 +33,7 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
             {track.duration_sec != null && <> · {formatTime(track.duration_sec * 1000)}</>}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <LyricsStatusDot status={track.lyrics_status} manual={track.lyrics_source === "manual"} />
+            <LyricsStatusDot status={track.lyrics_status} manual={track.lyrics_source === "manual"} hidden={track.lyrics_ignored === 1} />
             <SpotifyStatusDot status={track.spotify_status} uri={track.spotify_uri} />
             {playlists.map((p) => (
               <Link key={p.id} href={`/biblioteca/${p.id}`} className="rounded-full bg-pill px-[13px] py-1 text-xs text-ink hover:bg-hairline">
@@ -46,7 +47,13 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
       <div className="flex flex-wrap items-center gap-2">
         <PlayButton trackId={track.id} />
         <SpotifyButton uri={track.spotify_uri} title={track.title} artist={track.primary_artist} />
+        {(track.lyrics_ignored === 1 || track.lyrics_status === "not_found" || track.lyrics_status === "error") && (
+          <IgnoreLyricsButton trackId={track.id} ignored={track.lyrics_ignored === 1} variant="pill" />
+        )}
       </div>
+      {track.lyrics_ignored === 1 && (
+        <p className="-mt-4 text-[13px] text-secondary">Oculta: no aparece en “Canciones sin letra” y no se vuelve a buscar.</p>
+      )}
 
       {track.lyrics_error && (
         <p className="flex items-center gap-1.5 text-[13px] text-warn">

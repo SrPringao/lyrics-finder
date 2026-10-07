@@ -65,13 +65,20 @@ function TimeButton({
   );
 }
 
+/** La portada que llega del reproductor se usa al instante, sin esperar a recargar la página. */
+function useLiveCover(t: ResultTrack): string | null {
+  const { track } = useSpotify();
+  return (track?.id === t.trackId ? track.coverUrl : null) ?? t.coverUrl;
+}
+
 function CompactRow({ t }: { t: ResultTrack }) {
+  const cover = useLiveCover(t);
   const timed = t.hits.filter((h) => h.timeMs != null);
   const shown = (timed.length ? timed : t.hits.slice(0, 1)).slice(0, 2);
   const extra = t.hits.length - shown.length;
   return (
     <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-[14px] border-b border-hairline sm:grid-cols-[44px_minmax(0,1fr)_150px]">
-      <Cover url={t.coverUrl} size={44} radius={6} />
+      <Cover url={cover} size={44} radius={6} />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold">
           <Link href={`/cancion/${t.trackId}`} className="hover:underline">
@@ -95,6 +102,7 @@ function CompactRow({ t }: { t: ResultTrack }) {
 
 /** La canción que suena: expandida, con todos sus tiempos como chips. */
 function ExpandedRow({ t }: { t: ResultTrack }) {
+  const cover = useLiveCover(t);
   const pos = usePositionMs(250);
   const timed = t.hits.filter((h) => h.timeMs != null);
   // El chip "que suena": la última mención que ya empezó (la reproducción arranca 1.5 s antes).
@@ -102,7 +110,7 @@ function ExpandedRow({ t }: { t: ResultTrack }) {
   return (
     <div className="-mx-4 mt-2 mb-1 flex flex-col gap-2.5 rounded-[14px] bg-tint px-4 py-[14px] text-tint-ink">
       <div className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-[14px]">
-        <Cover url={t.coverUrl} size={44} radius={6} placeholderClassName="bg-white/50 text-tint-secondary" />
+        <Cover url={cover} size={44} radius={6} placeholderClassName="bg-white/50 text-tint-secondary" />
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">
             <Link href={`/cancion/${t.trackId}`} className="hover:underline">

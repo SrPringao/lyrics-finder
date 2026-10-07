@@ -20,6 +20,8 @@ export interface TrackRow {
   plain_lyrics: string | null;
   synced_lyrics_raw: string | null;
   lyrics_error: string | null;
+  /** 1 = el usuario la ocultó (sabe que no tiene letra): no se reintenta ni aparece en "sin letra". */
+  lyrics_ignored: number;
   isrc: string | null;
   apple_id: string | null;
   spotify_status: "matched" | "not_found" | null;
@@ -49,6 +51,8 @@ export interface PlaylistSummary {
   spotify_matched: number;
   spotify_not_found: number;
   cover_url: string | null;
+  /** Canciones ocultadas por no tener letra. */
+  ignored: number;
 }
 
 /** Estados que todavía vale la pena consultar en LRCLIB. */
@@ -62,12 +66,16 @@ export function dedupeKey(t: Pick<ParsedTrack, "title" | "primaryArtist">): stri
 // Importación
 // ---------------------------------------------------------------------------
 
-export function importPlaylist(db: DB, name: string, parsed: ParsedPlaylist): { playlistId: number; trackCount: number } {
-  const insertPlaylist = db.prepare("INSERT INTO playlists (name, source) VALUES (?, ?)");
+/**
+ * Devuelve una función que guarda una canción (o completa la que ya existía) y regresa su id.
+ * Busca primero por ISRC, luego por título + primer artista y, por último, por la clave
+ * antigua (título + artista completo, de antes de separar "A & B").
+ */
+function trackUpserter(db: DB): (t: ParsedTrack) => number {
   const byIsrc = db.prepare("SELECT id FROM tracks WHERE isrc = ? LIMIT 1");
+  const byUri = db.prepare("SELECT id FROM tracks WHERE spotify_uri = ? LIMIT 1");
   const byKey = db.prepare("SELECT id FROM tracks WHERE dedupe_key = ?");
   const byTitle = db.prepare("SELECT id, dedupe_key FROM tracks WHERE dedupe_key >= ? AND dedupe_key < ?");
-  // Clave antigua: título + artista completo tal como venía ("A, B & C"). Se compara sin separadores.
   const looseArtist = (a: string) => normalizeForCompare(a).replace(/\band\b/g, " ").replace(/\s+/g, " ").trim();
   const byLegacyKey = (t: ParsedTrack) => {
     const prefix = `${normalizeForCompare(t.title)}|`;
@@ -77,10 +85,10 @@ export function importPlaylist(db: DB, name: string, parsed: ParsedPlaylist): { 
   };
   const insertTrack = db.prepare(`
     INSERT INTO tracks (dedupe_key, title, artist, primary_artist, album, duration_sec, spotify_uri,
-                        spotify_status, spotify_matched_via, isrc, apple_id)
+                        spotify_status, spotify_matched_via, isrc, apple_id, cover_url)
     VALUES (@key, @title, @artist, @primaryArtist, @album, @durationSec, @spotifyUri,
             CASE WHEN @spotifyUri IS NULL THEN NULL ELSE 'matched' END,
-            CASE WHEN @spotifyUri IS NULL THEN NULL ELSE 'export' END, @isrc, @appleId)
+            CASE WHEN @spotifyUri IS NULL THEN NULL ELSE 'export' END, @isrc, @appleId, @coverUrl)
     RETURNING id
   `);
   // Completa datos que falten sin pisar los que ya había.
@@ -92,41 +100,78 @@ export function importPlaylist(db: DB, name: string, parsed: ParsedPlaylist): { 
       album               = COALESCE(album, @album),
       duration_sec        = COALESCE(duration_sec, @durationSec),
       isrc                = COALESCE(isrc, @isrc),
-      apple_id            = COALESCE(apple_id, @appleId)
+      apple_id            = COALESCE(apple_id, @appleId),
+      cover_url           = COALESCE(cover_url, @coverUrl)
     WHERE id = @id
   `);
-  const link = db.prepare("INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)");
 
+  return (t) => {
+    const params = {
+      key: dedupeKey(t),
+      title: t.title,
+      artist: t.artist,
+      primaryArtist: t.primaryArtist,
+      album: t.album,
+      durationSec: t.durationSec,
+      spotifyUri: t.spotifyUri ?? null,
+      isrc: t.isrc ?? null,
+      appleId: t.appleId ?? null,
+      coverUrl: t.coverUrl ?? null,
+    };
+    const existing = ((t.isrc && byIsrc.get(t.isrc)) ||
+      (t.spotifyUri && byUri.get(t.spotifyUri)) ||
+      byKey.get(params.key) ||
+      (t.artist !== t.primaryArtist && byLegacyKey(t))) as { id: number } | undefined;
+    if (existing) {
+      fillTrack.run({ ...params, id: existing.id });
+      return existing.id;
+    }
+    return (insertTrack.get(params) as { id: number }).id;
+  };
+}
+
+export function importPlaylist(db: DB, name: string, parsed: ParsedPlaylist): { playlistId: number; trackCount: number } {
+  const insertPlaylist = db.prepare("INSERT INTO playlists (name, source) VALUES (?, ?)");
+  const link = db.prepare("INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)");
+  const upsert = trackUpserter(db);
   return db.transaction(() => {
     const playlistId = Number(insertPlaylist.run(name, parsed.source).lastInsertRowid);
-    parsed.tracks.forEach((t, position) => {
-      const params = {
-        key: dedupeKey(t),
-        title: t.title,
-        artist: t.artist,
-        primaryArtist: t.primaryArtist,
-        album: t.album,
-        durationSec: t.durationSec,
-        spotifyUri: t.spotifyUri ?? null,
-        isrc: t.isrc ?? null,
-        appleId: t.appleId ?? null,
-      };
-      // 1) misma grabación (ISRC)  2) mismo título + primer artista
-      // 3) clave antigua: título + artista completo (canciones importadas antes de separar "A & B")
-      const existing = ((t.isrc && byIsrc.get(t.isrc)) ||
-        byKey.get(params.key) ||
-        (t.artist !== t.primaryArtist && byLegacyKey(t))) as { id: number } | undefined;
-
-      let id: number;
-      if (existing) {
-        id = existing.id;
-        fillTrack.run({ ...params, id });
-      } else {
-        id = (insertTrack.get(params) as { id: number }).id;
-      }
-      link.run(playlistId, id, position);
-    });
+    parsed.tracks.forEach((t, position) => link.run(playlistId, upsert(t), position));
     return { playlistId, trackCount: parsed.tracks.length };
+  })();
+}
+
+/** Lista donde caen las canciones y álbumes agregados desde la búsqueda de Spotify. */
+export const ADDED_PLAYLIST_NAME = "Agregadas desde Spotify";
+
+export function getOrCreatePlaylist(db: DB, name: string, source: string): number {
+  const row = db.prepare("SELECT id FROM playlists WHERE name = ? AND source = ? ORDER BY id LIMIT 1").get(name, source) as
+    | { id: number }
+    | undefined;
+  if (row) return row.id;
+  return Number(db.prepare("INSERT INTO playlists (name, source) VALUES (?, ?)").run(name, source).lastInsertRowid);
+}
+
+/** Agrega canciones al final de una playlist existente; las que ya estaban en ella no se repiten. */
+export function addTracksToPlaylist(db: DB, playlistId: number, parsed: ParsedPlaylist): { added: number; already: number } {
+  const inPlaylist = db.prepare("SELECT 1 FROM playlist_tracks WHERE playlist_id = ? AND track_id = ? LIMIT 1");
+  const maxPos = db.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM playlist_tracks WHERE playlist_id = ?");
+  const link = db.prepare("INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)");
+  const upsert = trackUpserter(db);
+  return db.transaction(() => {
+    let position = (maxPos.get(playlistId) as { m: number }).m + 1;
+    let added = 0;
+    let already = 0;
+    for (const t of parsed.tracks) {
+      const id = upsert(t);
+      if (inPlaylist.get(playlistId, id)) {
+        already++;
+        continue;
+      }
+      link.run(playlistId, id, position++);
+      added++;
+    }
+    return { added, already };
   })();
 }
 
@@ -167,9 +212,11 @@ export function saveManualLyrics(db: DB, trackId: number, text: string): TrackSt
   db.transaction(() => {
     db.prepare(
       `UPDATE tracks SET lyrics_status = ?, lyrics_source = ?, lrclib_id = NULL, plain_lyrics = ?,
-         synced_lyrics_raw = ?, lyrics_error = NULL, lyrics_updated_at = datetime('now')
+         synced_lyrics_raw = ?, lyrics_error = NULL, lyrics_updated_at = datetime('now'),
+         -- Si ahora tiene letra, deja de estar oculta.
+         lyrics_ignored = CASE WHEN ? IS NOT NULL THEN 0 ELSE lyrics_ignored END
        WHERE id = ?`,
-    ).run(status, plain ? "manual" : null, plain, synced, trackId);
+    ).run(status, plain ? "manual" : null, plain, synced, plain, trackId);
     replaceLines(db, trackId, synced ? parseLrc(synced) : plain ? parsePlain(plain) : []);
   })();
   return status;
@@ -184,7 +231,8 @@ export function tracksToFetch(db: DB, playlistId: number): TrackRow[] {
   return db
     .prepare(
       `SELECT DISTINCT t.* FROM tracks t JOIN playlist_tracks pt ON pt.track_id = t.id
-       WHERE pt.playlist_id = ? AND t.lyrics_status IN (${FETCHABLE.map(() => "?").join(",")})
+       WHERE pt.playlist_id = ? AND t.lyrics_ignored = 0
+         AND t.lyrics_status IN (${FETCHABLE.map(() => "?").join(",")})
        ORDER BY pt.position`,
     )
     .all(playlistId, ...FETCHABLE) as TrackRow[];
@@ -200,8 +248,9 @@ const SUMMARY_COLUMNS = `
   COALESCE(SUM(t.lyrics_status = 'synced'), 0)       AS synced,
   COALESCE(SUM(t.lyrics_status = 'plain'), 0)        AS plain,
   COALESCE(SUM(t.lyrics_status = 'instrumental'), 0) AS instrumental,
-  COALESCE(SUM(t.lyrics_status = 'not_found'), 0)    AS not_found,
-  COALESCE(SUM(t.lyrics_status = 'error'), 0)        AS error,
+  COALESCE(SUM(t.lyrics_status = 'not_found' AND t.lyrics_ignored = 0), 0) AS not_found,
+  COALESCE(SUM(t.lyrics_status = 'error' AND t.lyrics_ignored = 0), 0)     AS error,
+  COALESCE(SUM(t.lyrics_ignored = 1), 0)                                   AS ignored,
   COALESCE(SUM(t.lyrics_status = 'pending'), 0)      AS pending,
   COALESCE(SUM(t.spotify_status = 'matched'), 0)     AS spotify_matched,
   COALESCE(SUM(t.spotify_status = 'not_found'), 0)   AS spotify_not_found,
@@ -250,7 +299,16 @@ export function getPlaylistTracks(db: DB, playlistId: number, page?: unknown, pe
   return { items, total, page: p.page, pages: p.pages };
 }
 
-const WITHOUT_LYRICS = "lyrics_status IN ('not_found','error')";
+const WITHOUT_LYRICS = "lyrics_status IN ('not_found','error') AND lyrics_ignored = 0";
+
+/** Oculta (o vuelve a mostrar) una canción que nunca tendrá letra. */
+export function setLyricsIgnored(db: DB, trackId: number, ignored: boolean): boolean {
+  return db.prepare("UPDATE tracks SET lyrics_ignored = ? WHERE id = ?").run(ignored ? 1 : 0, trackId).changes > 0;
+}
+
+export function listIgnoredTracks(db: DB): TrackRow[] {
+  return db.prepare("SELECT * FROM tracks WHERE lyrics_ignored = 1 ORDER BY artist, title").all() as TrackRow[];
+}
 
 export function listTracksWithoutLyrics(db: DB): TrackRow[];
 export function listTracksWithoutLyrics(db: DB, page: unknown, perPage: number): Page<TrackRow>;

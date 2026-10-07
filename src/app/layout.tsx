@@ -20,7 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             {/* Contenido: ocupa toda la altura; la lista crece y la paginación queda abajo. */}
             <div className="flex min-h-dvh min-w-0 flex-col px-4 pb-[96px] lg:h-dvh lg:min-h-0 lg:overflow-y-auto lg:px-[44px] lg:pb-6">
               <SiteHeader />
-              <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+              <main className="flex flex-1 flex-col">{children}</main>
             </div>
             <aside aria-label="Ahora suena" className="hidden lg:block lg:h-dvh lg:min-h-0">
               <NowPlayingPanel />

@@ -15,6 +15,10 @@ export interface ParsedTrack {
   /** Código ISRC de la grabación: permite encontrar la canción exacta en Spotify. */
   isrc?: string;
   appleId?: string;
+  /** Portada del álbum (solo cuando la canción viene directo de Spotify). */
+  coverUrl?: string;
+  /** Lista original de artistas (solo de Spotify: un nombre puede llevar coma). */
+  artists?: string[];
 }
 
 export interface ParsedPlaylist {

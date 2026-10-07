@@ -17,7 +17,9 @@ function Dot({ text, dot, color, title }: { text: string; dot: string; color: st
   );
 }
 
-export function LyricsStatusDot({ status, manual }: { status: string; manual?: boolean }) {
+export function LyricsStatusDot({ status, manual, hidden }: { status: string; manual?: boolean; hidden?: boolean }) {
+  // Oculta por el usuario: ya no es un problema pendiente, se muestra en gris.
+  if (hidden && (status === "not_found" || status === "error")) return <Dot text="Sin letra (oculta)" dot="bg-disabled" color="text-secondary" />;
   const s = LYRICS[status] ?? LYRICS.pending;
   return <Dot {...s} text={manual ? `${s.text} · manual` : s.text} />;
 }

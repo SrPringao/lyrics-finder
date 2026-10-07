@@ -44,7 +44,11 @@ describe("resaltado en el panel", () => {
 
   it("contiene el texto, y frases entre comillas", () => {
     expect(hits("Madridista de corazón", "madri", "contiene")).toEqual(["Madri"]);
-    expect(hits("tren nocturno a Madrid", '"tren nocturno"', "palabra")).toEqual(["tren", "nocturno"]);
+    expect(hits("tren nocturno a Madrid", '"tren nocturno"', "palabra")).toEqual(["tren nocturno"]);
+    // Sin comillas también es frase: no se resalta cada palabra suelta.
+    expect(hits("me grita desde la cocina", "me cocina", "palabra")).toEqual([]);
+    expect(hits("Y ahora me, cocina en casa", "me cocina", "palabra")).toEqual(["me, cocina"]);
+    expect(hits("me grita desde la cocina", '"me" "cocina"', "palabra")).toEqual(["me", "cocina"]);
     expect(hits("ma ma", "ma", "contiene")).toEqual([]);
   });
 

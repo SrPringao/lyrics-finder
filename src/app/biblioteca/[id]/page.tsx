@@ -22,7 +22,7 @@ export default async function PlaylistPage({ params, searchParams }: PageProps<"
   const tracks = getPlaylistTracks(db, id, sp.p, PER_PAGE);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-3 border-b border-hairline pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <Link href="/biblioteca" className="text-[13px] text-secondary hover:text-ink">
@@ -31,7 +31,8 @@ export default async function PlaylistPage({ params, searchParams }: PageProps<"
           <h1 className="truncate text-[30px] font-bold tracking-[-0.03em]">{summary.name}</h1>
           <p className="text-[13px] text-secondary">
             {summary.total} canciones · {summary.synced} sincronizadas · {summary.plain} sin tiempos · {summary.instrumental}{" "}
-            instrumentales · {summary.not_found + summary.error} sin letra · {summary.spotify_matched} en Spotify
+            instrumentales · {summary.not_found + summary.error} sin letra
+            {summary.ignored > 0 && ` · ${summary.ignored} ocultas`} · {summary.spotify_matched} en Spotify
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -58,7 +59,7 @@ export default async function PlaylistPage({ params, searchParams }: PageProps<"
               <span className="font-normal text-secondary">· {t.artist}</span>
             </div>
             <div className="flex items-center gap-3 truncate text-[13px] text-snippet">
-              <LyricsStatusDot status={t.lyrics_status} manual={t.lyrics_source === "manual"} />
+              <LyricsStatusDot status={t.lyrics_status} manual={t.lyrics_source === "manual"} hidden={t.lyrics_ignored === 1} />
               <span className="hidden sm:inline">
                 <SpotifyStatusDot status={t.spotify_status} uri={t.spotify_uri} />
               </span>

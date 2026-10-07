@@ -1,6 +1,7 @@
 /**
- * Resalta en el cliente los términos de la búsqueda dentro de una línea de letra
- * (el panel "Ahora suena" no pasa por FTS5). Ignora mayúsculas y acentos como la búsqueda.
+ * Resalta en el cliente la búsqueda dentro de una línea de letra (el panel "Ahora suena" no pasa
+ * por FTS5). Sigue las mismas reglas que la búsqueda: varias palabras seguidas son una frase,
+ * cada texto entre comillas es otra, e ignora mayúsculas y acentos.
  */
 
 export type HighlightMode = "palabra" | "contiene";
@@ -10,8 +11,8 @@ export interface Segment {
   hit: boolean;
 }
 
-interface Term {
-  text: string;
+interface Phrase {
+  words: string[];
   prefix: boolean;
 }
 
@@ -19,52 +20,59 @@ function fold(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
-export function queryTerms(query: string, mode: HighlightMode): Term[] {
-  const terms: Term[] = [];
+const cleanWord = (w: string) => fold(w.replace(/["*]/g, "")).replace(/[^\p{L}\p{N}]/gu, "");
+
+export function queryPhrases(query: string, mode: HighlightMode): Phrase[] {
+  const phrases: Phrase[] = [];
+  const push = (raw: string[], prefix: boolean) => {
+    const words = raw.map(cleanWord).filter(Boolean);
+    if (words.length === 0) return;
+    if (mode === "contiene" && [...words.join(" ")].length < 3) return;
+    phrases.push({ words, prefix: prefix && mode === "palabra" });
+  };
+  let run: string[] = [];
+  const flush = () => {
+    if (run.length) push(run, /\*$/.test(run[run.length - 1]));
+    run = [];
+  };
   const re = /"([^"]*)"|(\S+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(query))) {
-    const raw = m[1] !== undefined ? m[1] : m[2];
-    for (const word of raw.split(/\s+/)) {
-      const prefix = mode === "palabra" && word.endsWith("*");
-      const clean = fold(word.replace(/["*]/g, "")).replace(/[^\p{L}\p{N}]/gu, "");
-      if (!clean) continue;
-      if (mode === "contiene" && [...clean].length < 3) continue;
-      terms.push({ text: clean, prefix });
-    }
+    if (m[1] !== undefined) {
+      flush();
+      push(m[1].trim().split(/\s+/), false);
+    } else run.push(m[2]);
   }
-  return terms;
+  flush();
+  return phrases;
 }
 
-const isWordChar = (c: string | undefined) => !!c && /[\p{L}\p{N}]/u.test(c);
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export function highlightTerms(text: string, query: string, mode: HighlightMode): Segment[] {
-  const terms = queryTerms(query, mode);
-  if (terms.length === 0 || !text) return [{ text, hit: false }];
+  const phrases = queryPhrases(query, mode);
+  if (phrases.length === 0 || !text) return [{ text, hit: false }];
 
   // Texto "doblado" carácter por carácter, con el índice original de cada uno.
   let folded = "";
   const map: number[] = [];
-  [...text].forEach((ch, idx) => {
-    const f = fold(ch);
-    for (const c of f) {
+  const chars = [...text];
+  chars.forEach((ch, idx) => {
+    for (const c of fold(ch)) {
       folded += c;
       map.push(idx);
     }
   });
-  const chars = [...text];
   const hit = new Array<boolean>(chars.length).fill(false);
 
-  for (const term of terms) {
-    let from = 0;
-    while (true) {
-      const at = folded.indexOf(term.text, from);
-      if (at === -1) break;
-      const end = at + term.text.length;
-      const ok =
-        mode === "contiene" || (!isWordChar(folded[at - 1]) && (term.prefix || !isWordChar(folded[end])));
-      if (ok) for (let k = at; k < end; k++) hit[map[k]] = true;
-      from = at + 1;
+  for (const p of phrases) {
+    // Entre palabras de la frase puede haber espacios o puntuación ("me, cocina").
+    const body = p.words.map(escape).join("[^\\p{L}\\p{N}]+");
+    const source =
+      mode === "contiene" ? body : `(?<![\\p{L}\\p{N}])${body}${p.prefix ? "" : "(?![\\p{L}\\p{N}])"}`;
+    for (const match of folded.matchAll(new RegExp(source, "gu"))) {
+      const start = match.index ?? 0;
+      for (let k = start; k < start + match[0].length; k++) hit[map[k]] = true;
     }
   }
 

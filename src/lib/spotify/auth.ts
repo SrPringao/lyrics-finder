@@ -8,6 +8,9 @@ export const SCOPES = [
   "streaming", // reproductor dentro de la página (Web Playback SDK)
   "user-read-email",
   "user-read-private", // saber si la cuenta es Premium
+  "playlist-read-private", // importar tus playlists
+  "playlist-read-collaborative",
+  "user-library-read", // importar "Tus me gusta"
 ].join(" ");
 
 const ACCOUNTS = "https://accounts.spotify.com";

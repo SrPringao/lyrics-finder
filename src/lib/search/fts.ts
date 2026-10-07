@@ -10,38 +10,49 @@ export const HL_END = "\u0002";
 
 /**
  * Convierte lo que escribe el usuario en una expresión FTS5 segura:
- *  - "frase exacta" entre comillas se respeta como frase
- *  - cada palabra suelta se cita (así caracteres como - : * ( no rompen la consulta)
- *  - palabra* activa búsqueda por prefijo (modo "palabra")
- *  - todas las partes se combinan con AND
- * En modo "contiene" los términos de menos de 3 letras se ignoran y se reportan en `ignored`.
+ *  - varias palabras seguidas se buscan juntas y en ese orden, como frase ("me cocina")
+ *  - cada texto entre comillas es su propia frase; varias frases se combinan con AND
+ *    (`"me" "cocina"` busca las dos palabras en cualquier parte de la línea)
+ *  - palabra* al final activa búsqueda por prefijo (modo "palabra")
+ *  - todo se cita, así caracteres como - : * ( no rompen la consulta
+ * En modo "contiene" las frases de menos de 3 letras se ignoran y se reportan en `ignored`.
  */
 export function parseQuery(input: string, mode: SearchMode = "palabra"): { match: string | null; ignored: string[] } {
   const parts: string[] = [];
   const ignored: string[] = [];
   const tooShort = (t: string) => mode === "contiene" && [...t].length < MIN_CONTAINS_LENGTH;
+  const hasText = (w: string) => /[\p{L}\p{N}]/u.test(w);
+
+  const pushPhrase = (words: string[], prefix: boolean) => {
+    // Palabras que solo son puntuación no aportan nada (y FTS5 las rechazaría).
+    const clean = words.map((w) => w.replace(/["*]/g, "")).filter(hasText);
+    if (clean.length === 0) return;
+    const phrase = clean.join(" ");
+    if (tooShort(phrase)) {
+      ignored.push(phrase);
+      return;
+    }
+    // En "contiene" ya se busca dentro de las palabras: el * no hace falta.
+    parts.push(`"${phrase}"${prefix && mode === "palabra" ? "*" : ""}`);
+  };
+
+  let run: string[] = [];
+  const flush = () => {
+    if (run.length) pushPhrase(run, /\*$/.test(run[run.length - 1]));
+    run = [];
+  };
+
   const re = /"([^"]*)"|(\S+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(input))) {
     if (m[1] !== undefined) {
-      const phrase = m[1].replace(/"/g, "").trim();
-      if (!phrase) continue;
-      if (tooShort(phrase)) ignored.push(phrase);
-      else parts.push(`"${phrase}"`);
+      flush();
+      pushPhrase(m[1].trim().split(/\s+/), false);
     } else {
-      const word = m[2].replace(/"/g, "");
-      const prefix = word.endsWith("*");
-      const clean = word.replace(/\*+$/, "");
-      // Palabras que solo son puntuación no aportan nada (y FTS5 las rechazaría).
-      if (!/[\p{L}\p{N}]/u.test(clean)) continue;
-      if (tooShort(clean)) {
-        ignored.push(clean);
-        continue;
-      }
-      // En "contiene" ya se busca dentro de las palabras: el * no hace falta.
-      parts.push(`"${clean}"${prefix && mode === "palabra" ? "*" : ""}`);
+      run.push(m[2]);
     }
   }
+  flush();
   return { match: parts.length ? parts.join(" AND ") : null, ignored };
 }
 

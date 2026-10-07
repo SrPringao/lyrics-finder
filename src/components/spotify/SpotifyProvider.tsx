@@ -318,11 +318,15 @@ export function SpotifyProvider({ children }: { children: React.ReactNode }) {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ url: s.coverUrl }),
-          }).catch(() => {});
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            // Se guardó: refresca la página para que la portada aparezca en listas y resultados.
+            .then((d: { saved?: boolean } | null) => d?.saved && router.refresh())
+            .catch(() => {});
         }
       }
     },
-    [setClock, setDuration],
+    [setClock, setDuration, router],
   );
 
   const applySdkState = useCallback(

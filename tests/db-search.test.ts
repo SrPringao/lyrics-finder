@@ -8,7 +8,9 @@ import {
   importPlaylist,
   listTracksWithoutLyrics,
   saveLyricsResult,
+  listIgnoredTracks,
   saveManualLyrics,
+  setLyricsIgnored,
   tracksToFetch,
 } from "@/lib/db/repo";
 import { fetchPlaylistLyrics } from "@/lib/import/fetcher";
@@ -94,6 +96,28 @@ describe("letras y caché", () => {
   });
 });
 
+describe("canciones ocultas (sin letra a propósito)", () => {
+  it("salen de 'sin letra', de los conteos y de los reintentos; vuelven si se pega su letra", () => {
+    const { playlistId } = importPlaylist(db, "p", playlist([["Instrumental", "X"], ["Inédita", "Y"]]));
+    const [a, b] = tracksToFetch(db, playlistId);
+    for (const t of [a, b]) saveLyricsResult(db, t.id, { status: "not_found", syncedLyrics: null, plainLyrics: null, lrclibId: null, matchedVia: null });
+
+    setLyricsIgnored(db, a.id, true);
+    expect(listTracksWithoutLyrics(db).map((t) => t.title)).toEqual(["Inédita"]);
+    expect(listIgnoredTracks(db).map((t) => t.title)).toEqual(["Instrumental"]);
+    expect(tracksToFetch(db, playlistId).map((t) => t.title)).toEqual(["Inédita"]);
+    expect(getPlaylistSummary(db, playlistId)).toMatchObject({ not_found: 1, ignored: 1 });
+
+    // Pegar una letra (inventada) la deja de ocultar.
+    saveManualLyrics(db, a.id, "una línea inventada");
+    expect(listIgnoredTracks(db)).toHaveLength(0);
+
+    setLyricsIgnored(db, b.id, true);
+    setLyricsIgnored(db, b.id, false);
+    expect(listTracksWithoutLyrics(db).map((t) => t.title)).toEqual(["Inédita"]);
+  });
+});
+
 describe("fetchPlaylistLyrics", () => {
   it("descarga, clasifica y registra errores sin detenerse", async () => {
     const { playlistId } = importPlaylist(db, "p", playlist([["Sync", "X"], ["Inst", "X"], ["Nada", "X"], ["Falla", "X"]]));
@@ -145,7 +169,11 @@ describe("búsqueda FTS", () => {
     seed();
     expect(searchLyrics(db, '"tren nocturno"').totalLines).toBe(1);
     expect(searchLyrics(db, '"nocturno tren"').totalLines).toBe(0);
-    expect(searchLyrics(db, "nocturno tren").totalLines).toBe(1);
+    // Varias palabras sin comillas también son frase: juntas y en ese orden.
+    expect(searchLyrics(db, "tren nocturno").totalLines).toBe(1);
+    expect(searchLyrics(db, "nocturno tren").totalLines).toBe(0);
+    // Cada palabra entre comillas por separado: las dos en cualquier parte de la línea.
+    expect(searchLyrics(db, '"nocturno" "tren"').totalLines).toBe(1);
   });
 
   it("filtra por playlist", () => {
@@ -159,6 +187,22 @@ describe("búsqueda FTS", () => {
       expect(() => searchLyrics(db, q)).not.toThrow();
     expect(buildMatchQuery("  ")).toBeNull();
     expect(buildMatchQuery('hola "me voy" mad*')).toBe('"hola" AND "me voy" AND "mad"*');
+  });
+});
+
+describe("varias palabras = frase", () => {
+  it("'me cocina' solo encuentra las líneas donde van juntas", () => {
+    const { playlistId } = importPlaylist(db, "p", playlist([["Uno", "X"], ["Dos", "Y"], ["Tres", "Z"]]));
+    const [a, b, c] = tracksToFetch(db, playlistId);
+    // Letras inventadas.
+    saveLyricsResult(db, a.id, { status: "plain", syncedLyrics: null, plainLyrics: "Siempre me grita desde la cocina", lrclibId: 1, matchedVia: "get" });
+    saveLyricsResult(db, b.id, { status: "plain", syncedLyrics: null, plainLyrics: "Un amigo me cocina los domingos", lrclibId: 2, matchedVia: "get" });
+    saveLyricsResult(db, c.id, { status: "plain", syncedLyrics: null, plainLyrics: "Me cocina, me canta y se va", lrclibId: 3, matchedVia: "get" });
+    for (const mode of ["palabra", "contiene"] as const) {
+      expect(searchLyrics(db, "me cocina", { mode }).tracks.map((t) => t.title).sort()).toEqual(["Dos", "Tres"]);
+    }
+    expect(searchLyrics(db, "me cocin*").tracks).toHaveLength(2);
+    expect(searchLyrics(db, '"me" "cocina"').tracks).toHaveLength(3);
   });
 });
 
@@ -184,7 +228,8 @@ describe("búsqueda 'contiene el texto'", () => {
 
   it("ignora términos de menos de 3 letras y lo reporta", () => {
     seed();
-    expect(parseQuery("ma tren", "contiene")).toEqual({ match: '"tren"', ignored: ["ma"] });
+    expect(parseQuery("ma tren", "contiene")).toEqual({ match: '"ma tren"', ignored: [] });
+    expect(parseQuery('"ma" tren', "contiene")).toEqual({ match: '"tren"', ignored: ["ma"] });
     const r = searchLyrics(db, "ma", { mode: "contiene" });
     expect(r).toMatchObject({ totalLines: 0, ignored: ["ma"] });
     expect(buildMatchQuery("mad*", "contiene")).toBe('"mad"');

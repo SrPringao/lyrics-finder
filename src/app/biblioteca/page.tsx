@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Cover } from "@/components/Cover";
+import { IgnoreLyricsButton } from "@/components/IgnoreLyricsButton";
 import { pageHref, Pagination } from "@/components/Pagination";
 import { PlaylistActions } from "@/components/PlaylistActions";
 import { LyricsStatusDot } from "@/components/StatusDot";
 import { getDb } from "@/lib/db";
-import { listPlaylists, listTracksWithoutLyrics } from "@/lib/db/repo";
+import { listIgnoredTracks, listPlaylists, listTracksWithoutLyrics } from "@/lib/db/repo";
 import { getSearchBlockedUntil, quotaMessage } from "@/lib/spotify/api";
 
 const SOURCE_LABEL: Record<string, string> = { spotify: "Spotify", apple: "Apple Music", csv: "CSV" };
@@ -19,9 +20,10 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
   const playlists = listPlaylists(db);
   const missing = listTracksWithoutLyrics(db, sp.p, PER_PAGE);
   const spotifyBlocked = getSearchBlockedUntil(db);
+  const hidden = listIgnoredTracks(db);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-10">
+    <div className="flex flex-1 flex-col gap-10">
       {spotifyBlocked && (
         <p className="flex items-start gap-1.5 text-[13px] text-secondary">
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
@@ -61,7 +63,7 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
         )}
       </section>
 
-      <section className="flex min-h-0 flex-1 flex-col">
+      <section className="flex flex-1 flex-col">
         <h2 className="border-b border-hairline pb-3 text-[17px] font-semibold">Canciones sin letra ({missing.total})</h2>
         {missing.total === 0 ? (
           <p className="pt-5 text-sm text-secondary">Todas las canciones tienen letra o son instrumentales.</p>
@@ -78,14 +80,42 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
                 </div>
                 <LyricsStatusDot status={t.lyrics_status} />
               </div>
-              <Link href={`/cancion/${t.id}`} className="text-[13px] font-semibold text-accent hover:underline">
-                Pegar letra
-              </Link>
+              <div className="flex items-center gap-4">
+                <IgnoreLyricsButton trackId={t.id} ignored={false} />
+                <Link href={`/cancion/${t.id}`} className="text-[13px] font-semibold text-accent hover:underline">
+                  Pegar letra
+                </Link>
+              </div>
             </div>
           ))
         )}
         <Pagination page={missing.page} pages={missing.pages} href={(n) => pageHref("/biblioteca", {}, n)} />
       </section>
+
+      {hidden.length > 0 && (
+        <details className="group pb-6">
+          <summary className="flex cursor-pointer list-none items-center justify-between border-b border-hairline pb-3 text-[15px] font-semibold text-secondary hover:text-ink">
+            <span>Ocultas ({hidden.length})</span>
+            <span className="text-xs font-normal">
+              <span className="group-open:hidden">Mostrar</span>
+              <span className="hidden group-open:inline">Esconder</span>
+            </span>
+          </summary>
+          <p className="pt-3 text-[13px] text-secondary">Canciones que marcaste como sin letra: no se vuelven a buscar.</p>
+          {hidden.map((t) => (
+            <div key={t.id} className={row}>
+              <Cover url={t.cover_url} size={44} radius={6} />
+              <div className="min-w-0 truncate text-sm font-semibold">
+                <Link href={`/cancion/${t.id}`} className="hover:underline">
+                  {t.title}
+                </Link>{" "}
+                <span className="font-normal text-secondary">· {t.artist}</span>
+              </div>
+              <IgnoreLyricsButton trackId={t.id} ignored />
+            </div>
+          ))}
+        </details>
+      )}
     </div>
   );
 }
