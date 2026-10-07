@@ -5,6 +5,7 @@ import { Toast } from "@/components/player/Toast";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SpotifyProvider } from "@/components/spotify/SpotifyProvider";
 import { ViewerProvider } from "@/components/ViewerProvider";
+import { appPassword } from "@/lib/auth/session";
 import { isGuest } from "@/lib/auth/viewer";
 import "./globals.css";
 
@@ -19,7 +20,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className="h-full antialiased">
       {/* Extensiones como ColorZilla agregan atributos al <body> antes de hidratar (cz-shortcut-listen). */}
       <body className="h-full bg-white text-ink" suppressHydrationWarning>
-        <ViewerProvider guest={guest}>
+        <ViewerProvider guest={guest} canLogout={!!appPassword()}>
         <SpotifyProvider>
           <div className="lg:grid lg:h-dvh lg:grid-cols-[minmax(0,1fr)_480px] lg:overflow-hidden">
             {/* Contenido: ocupa toda la altura; la lista crece y la paginación queda abajo. */}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useIsGuest } from "@/components/ViewerProvider";
+import { useViewer } from "@/components/ViewerProvider";
 
 const LINKS = [
   { href: "/buscar", label: "Buscar" },
@@ -12,7 +12,7 @@ const LINKS = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const guest = useIsGuest();
+  const { guest, canLogout } = useViewer();
   return (
     <header className="flex h-[72px] shrink-0 items-center gap-8">
       <Link href="/buscar" className="text-[22px] font-bold tracking-[-0.03em] text-ink">
@@ -28,6 +28,13 @@ export function SiteHeader() {
           );
         })}
       </nav>
+      {canLogout && (
+        <form method="post" action="/acceso/salir" className="ml-auto">
+          <button type="submit" className="text-sm text-secondary hover:text-ink">
+            Salir{guest && " (invitado)"}
+          </button>
+        </form>
+      )}
     </header>
   );
 }
