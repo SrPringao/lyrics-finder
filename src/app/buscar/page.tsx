@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { pageHref, Pagination } from "@/components/Pagination";
 import { ResultsList, type ResultTrack } from "@/components/search/ResultsList";
 import { SearchBar } from "@/components/search/SearchBar";
+import { isGuest } from "@/lib/auth/viewer";
 import { getDb } from "@/lib/db";
 import { listPlaylists, pageParams } from "@/lib/db/repo";
 import { MIN_CONTAINS_LENGTH, searchLyrics, type SearchMode } from "@/lib/search/fts";
@@ -18,6 +19,7 @@ export default async function BuscarPage({ searchParams }: PageProps<"/buscar">)
 
   const db = getDb();
   const playlists = listPlaylists(db);
+  const guest = await isGuest();
   const result = q.trim() ? searchLyrics(db, q, { playlistId, mode }) : null;
 
   const total = result?.tracks.length ?? 0;
@@ -57,11 +59,16 @@ export default async function BuscarPage({ searchParams }: PageProps<"/buscar">)
       <div className="mt-[18px] flex flex-1 flex-col border-t border-hairline">
         {playlists.length === 0 ? (
           <p className="pt-5 text-sm text-secondary">
-            Aún no hay playlists.{" "}
-            <Link href="/importar" className="font-semibold text-accent">
-              Importa una
-            </Link>{" "}
-            para empezar.
+            Aún no hay playlists.
+            {!guest && (
+              <>
+                {" "}
+                <Link href="/importar" className="font-semibold text-accent">
+                  Importa una
+                </Link>{" "}
+                para empezar.
+              </>
+            )}
           </p>
         ) : !result ? (
           <p className="pt-5 text-sm leading-relaxed text-secondary">

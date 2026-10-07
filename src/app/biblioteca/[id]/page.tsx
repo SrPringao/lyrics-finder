@@ -6,6 +6,7 @@ import { pageHref, Pagination } from "@/components/Pagination";
 import { PlaylistActions } from "@/components/PlaylistActions";
 import { PlayButton } from "@/components/spotify/PlayButton";
 import { LyricsStatusDot, SpotifyStatusDot } from "@/components/StatusDot";
+import { isGuest } from "@/lib/auth/viewer";
 import { getDb } from "@/lib/db";
 import { getPlaylistSummary, getPlaylistTracks } from "@/lib/db/repo";
 import { formatTime } from "@/lib/parsers/lrc";
@@ -20,6 +21,7 @@ export default async function PlaylistPage({ params, searchParams }: PageProps<"
   const summary = getPlaylistSummary(db, id);
   if (!summary) notFound();
   const tracks = getPlaylistTracks(db, id, sp.p, PER_PAGE);
+  const guest = await isGuest();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -39,12 +41,14 @@ export default async function PlaylistPage({ params, searchParams }: PageProps<"
           <Link href={`/buscar?playlist=${id}`} className="rounded-full bg-ink px-[13px] py-1.5 text-[13px] text-white">
             Buscar en esta playlist
           </Link>
-          <PlaylistActions
-            playlistId={id}
-            retryable={summary.not_found + summary.error + summary.pending}
-            unlinked={summary.total - summary.spotify_matched}
-            redirectOnDelete="/biblioteca"
-          />
+          {!guest && (
+            <PlaylistActions
+              playlistId={id}
+              retryable={summary.not_found + summary.error + summary.pending}
+              unlinked={summary.total - summary.spotify_matched}
+              redirectOnDelete="/biblioteca"
+            />
+          )}
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { IgnoreLyricsButton } from "@/components/IgnoreLyricsButton";
 import { pageHref, Pagination } from "@/components/Pagination";
 import { PlaylistActions } from "@/components/PlaylistActions";
 import { LyricsStatusDot } from "@/components/StatusDot";
+import { isGuest } from "@/lib/auth/viewer";
 import { getDb } from "@/lib/db";
 import { listIgnoredTracks, listPlaylists, listTracksWithoutLyrics } from "@/lib/db/repo";
 import { getSearchBlockedUntil, quotaMessage } from "@/lib/spotify/api";
@@ -21,6 +22,7 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
   const missing = listTracksWithoutLyrics(db, sp.p, PER_PAGE);
   const spotifyBlocked = getSearchBlockedUntil(db);
   const hidden = listIgnoredTracks(db);
+  const guest = await isGuest();
 
   return (
     <div className="flex flex-1 flex-col gap-10">
@@ -34,9 +36,11 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
       <section>
         <div className="flex items-center justify-between border-b border-hairline pb-3">
           <h1 className="text-[30px] font-bold tracking-[-0.03em]">Playlists</h1>
-          <Link href="/importar" className="text-[13px] font-semibold text-accent hover:underline">
-            Importar
-          </Link>
+          {!guest && (
+            <Link href="/importar" className="text-[13px] font-semibold text-accent hover:underline">
+              Importar
+            </Link>
+          )}
         </div>
         {playlists.length === 0 ? (
           <p className="pt-5 text-sm text-secondary">Todavía no has importado ninguna playlist.</p>
@@ -57,7 +61,9 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
                   {p.pending > 0 && ` · ${p.pending} pendientes`}
                 </div>
               </div>
-              <PlaylistActions playlistId={p.id} retryable={p.not_found + p.error + p.pending} unlinked={p.total - p.spotify_matched} />
+              {!guest && (
+                <PlaylistActions playlistId={p.id} retryable={p.not_found + p.error + p.pending} unlinked={p.total - p.spotify_matched} />
+              )}
             </div>
           ))
         )}
@@ -80,12 +86,14 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
                 </div>
                 <LyricsStatusDot status={t.lyrics_status} />
               </div>
-              <div className="flex items-center gap-4">
-                <IgnoreLyricsButton trackId={t.id} ignored={false} />
-                <Link href={`/cancion/${t.id}`} className="text-[13px] font-semibold text-accent hover:underline">
-                  Pegar letra
-                </Link>
-              </div>
+              {!guest && (
+                <div className="flex items-center gap-4">
+                  <IgnoreLyricsButton trackId={t.id} ignored={false} />
+                  <Link href={`/cancion/${t.id}`} className="text-[13px] font-semibold text-accent hover:underline">
+                    Pegar letra
+                  </Link>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -111,7 +119,7 @@ export default async function BibliotecaPage({ searchParams }: PageProps<"/bibli
                 </Link>{" "}
                 <span className="font-normal text-secondary">· {t.artist}</span>
               </div>
-              <IgnoreLyricsButton trackId={t.id} ignored />
+              {!guest && <IgnoreLyricsButton trackId={t.id} ignored />}
             </div>
           ))}
         </details>

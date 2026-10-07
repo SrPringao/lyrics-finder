@@ -8,6 +8,7 @@ import { LyricsScroller } from "@/components/player/LyricsScroller";
 import { AccountMenu, DeviceMenu } from "@/components/player/Menus";
 import { ProgressBar } from "@/components/player/ProgressBar";
 import { useSpotify } from "@/components/spotify/SpotifyProvider";
+import { useIsGuest } from "@/components/ViewerProvider";
 
 const coverShadow = "0 14px 30px rgba(40,60,35,0.28)";
 
@@ -15,6 +16,7 @@ const coverShadow = "0 14px 30px rgba(40,60,35,0.28)";
 export function NowPlayingPanel({ onClose }: { onClose?: () => void }) {
   const { status, track } = useSpotify();
   const pathname = usePathname();
+  const guest = useIsGuest();
   const connected = !!status?.connected;
 
   return (
@@ -37,6 +39,10 @@ export function NowPlayingPanel({ onClose }: { onClose?: () => void }) {
         <>
           <Cover url={null} size={132} radius={12} placeholderClassName="bg-white/50 text-tint-secondary" />
           <div className="flex flex-col items-start gap-4">
+            {guest ? (
+              <p className="text-[20px] font-bold tracking-[-0.02em]">Spotify no está conectado</p>
+            ) : (
+              <>
             <p className="text-[20px] font-bold tracking-[-0.02em]">Conecta Spotify para escuchar desde aquí</p>
             <a
               href={status.configured ? `/api/spotify/login?next=${encodeURIComponent(pathname)}` : "/spotify"}
@@ -44,6 +50,8 @@ export function NowPlayingPanel({ onClose }: { onClose?: () => void }) {
             >
               Conectar Spotify
             </a>
+              </>
+            )}
           </div>
           <div className="flex-grow" />
         </>

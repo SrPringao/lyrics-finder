@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DeviceIcon } from "@/components/Icons";
 import { BROWSER_DEVICE, useSpotify } from "@/components/spotify/SpotifyProvider";
+import { useIsGuest } from "@/components/ViewerProvider";
 import { initials } from "@/lib/player/timing";
 
 /** Cierra un menú al hacer clic fuera o con Escape. */
@@ -107,6 +108,7 @@ export function DeviceMenu() {
 
 export function AccountMenu() {
   const { status, logout } = useSpotify();
+  const guest = useIsGuest();
   const [open, setOpen] = useState(false);
   const ref = useDismiss(open, () => setOpen(false));
   const name = status?.displayName ?? "Tu cuenta";
@@ -130,18 +132,22 @@ export function AccountMenu() {
             <div className="font-semibold">{name}</div>
             <div className="text-xs text-secondary">{premium ? "Spotify Premium" : "Cuenta sin Premium: no se puede reproducir"}</div>
           </div>
-          <div className="my-1 h-px bg-hairline" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              void logout();
-            }}
-            className="w-full px-3.5 py-2 text-left hover:bg-pill"
-          >
-            Salir
-          </button>
+          {!guest && (
+            <>
+              <div className="my-1 h-px bg-hairline" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  void logout();
+                }}
+                className="w-full px-3.5 py-2 text-left hover:bg-pill"
+              >
+                Salir
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

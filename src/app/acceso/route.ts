@@ -1,4 +1,4 @@
-import { appPassword, checkPassword, safeNext, SESSION_COOKIE, SESSION_MAX_AGE, sessionToken } from "@/lib/auth/session";
+import { appPassword, roleForPassword, safeNext, SESSION_COOKIE, SESSION_MAX_AGE, sessionToken } from "@/lib/auth/session";
 import { requestOrigin } from "@/lib/spotify/origin";
 
 // Página suelta (sin el layout de la app): fuera de sesión las APIs que usa el layout responden 401.
@@ -54,7 +54,8 @@ export async function POST(req: Request) {
   const origin = requestOrigin(req);
   if (!appPassword()) return Response.redirect(new URL(next, origin), 303);
 
-  if (!checkPassword(form.get("password")?.toString() ?? "")) {
+  const role = roleForPassword(form.get("password")?.toString() ?? "");
+  if (!role) {
     // Frena un poco los intentos a ciegas.
     await new Promise((r) => setTimeout(r, 1000));
     return page(next, true);
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     status: 303,
     headers: {
       Location: new URL(next, origin).toString(),
-      "Set-Cookie": `${SESSION_COOKIE}=${sessionToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}${secure}`,
+      "Set-Cookie": `${SESSION_COOKIE}=${sessionToken(role)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}${secure}`,
     },
   });
 }

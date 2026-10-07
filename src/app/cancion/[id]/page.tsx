@@ -8,6 +8,7 @@ import { LyricsFull } from "@/components/song/LyricsFull";
 import { PlayButton } from "@/components/spotify/PlayButton";
 import { SpotifyButton } from "@/components/SpotifyButton";
 import { LyricsStatusDot, SpotifyStatusDot } from "@/components/StatusDot";
+import { isGuest } from "@/lib/auth/viewer";
 import { getDb } from "@/lib/db";
 import { getTrack, getTrackLines, getTrackPlaylists } from "@/lib/db/repo";
 import { formatTime } from "@/lib/parsers/lrc";
@@ -20,6 +21,7 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
   if (!track) notFound();
   const lines = getTrackLines(db, id).map((l) => ({ i: l.line_index, t: l.time_ms, text: l.text }));
   const playlists = getTrackPlaylists(db, id);
+  const guest = await isGuest();
 
   return (
     <div className="flex flex-col gap-7 pb-10">
@@ -47,7 +49,7 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
       <div className="flex flex-wrap items-center gap-2">
         <PlayButton trackId={track.id} />
         <SpotifyButton uri={track.spotify_uri} title={track.title} artist={track.primary_artist} />
-        {(track.lyrics_ignored === 1 || track.lyrics_status === "not_found" || track.lyrics_status === "error") && (
+        {!guest && (track.lyrics_ignored === 1 || track.lyrics_status === "not_found" || track.lyrics_status === "error") && (
           <IgnoreLyricsButton trackId={track.id} ignored={track.lyrics_ignored === 1} variant="pill" />
         )}
       </div>
@@ -62,11 +64,13 @@ export default async function CancionPage({ params }: PageProps<"/cancion/[id]">
         </p>
       )}
 
-      <LyricsEditor
-        trackId={track.id}
-        initialText={track.synced_lyrics_raw ?? track.plain_lyrics ?? ""}
-        startOpen={lines.length === 0 && track.lyrics_status !== "instrumental"}
-      />
+      {!guest && (
+        <LyricsEditor
+          trackId={track.id}
+          initialText={track.synced_lyrics_raw ?? track.plain_lyrics ?? ""}
+          startOpen={lines.length === 0 && track.lyrics_status !== "instrumental"}
+        />
+      )}
 
       <div className="border-t border-hairline pt-6">
         {track.lyrics_status === "instrumental" && lines.length === 0 ? (

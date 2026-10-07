@@ -1,15 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isValidSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { guestCanAccess } from "@/lib/auth/guest";
+import { sessionRole, SESSION_COOKIE } from "@/lib/auth/session";
 import { requestOrigin } from "@/lib/spotify/origin";
 
 export function proxy(req: NextRequest) {
-  if (isValidSession(req.cookies.get(SESSION_COOKIE)?.value)) return NextResponse.next();
-  if (req.nextUrl.pathname.startsWith("/api/")) {
-    return Response.json({ error: "Necesitas iniciar sesión." }, { status: 401 });
+  const { pathname, search } = req.nextUrl;
+  const isApi = pathname.startsWith("/api/");
+  const role = sessionRole(req.cookies.get(SESSION_COOKIE)?.value);
+
+  if (!role) {
+    if (isApi) return Response.json({ error: "Necesitas iniciar sesión." }, { status: 401 });
+    const login = new URL("/acceso", requestOrigin(req));
+    login.searchParams.set("next", pathname + search);
+    return NextResponse.redirect(login);
   }
-  const login = new URL("/acceso", requestOrigin(req));
-  login.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
-  return NextResponse.redirect(login);
+
+  if (role === "guest" && !guestCanAccess(req.method, pathname)) {
+    if (isApi) return Response.json({ error: "Los invitados solo pueden buscar y reproducir." }, { status: 403 });
+    return NextResponse.redirect(new URL("/buscar", requestOrigin(req)));
+  }
+  return NextResponse.next();
 }
 
 export const config = {

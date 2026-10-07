@@ -43,3 +43,6 @@ next-env.d.ts
 
 # base de datos local
 /data/
+
+# copias exportadas de la base
+*.db
