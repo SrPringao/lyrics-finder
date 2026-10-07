@@ -4,6 +4,9 @@ import path from "node:path";
 
 export type DB = Database.Database;
 
+/** Expresión SQL que cambia ñ/Ñ por U+E000 (57344); debe coincidir con `protectEnye` de la búsqueda. */
+const ENYE_SQL = (col: string) => `replace(replace(${col}, 'ñ', char(57344)), 'Ñ', char(57344))`;
+
 // Cada entrada es una migración; el índice + 1 es el `user_version` resultante.
 const MIGRATIONS: string[] = [
   `
@@ -148,6 +151,51 @@ const MIGRATIONS: string[] = [
   // v6: canciones que el usuario ocultó porque sabe que nunca tendrán letra.
   `
   ALTER TABLE tracks ADD COLUMN lyrics_ignored INTEGER NOT NULL DEFAULT 0;
+  `,
+  // v7: la ñ deja de confundirse con la n. Los tokenizadores quitan diacríticos (y la tilde de la ñ
+  // es uno), así que los índices leen el texto desde una vista que cambia ñ/Ñ por U+E000 (uso
+  // privado, no se pliega). La búsqueda hace el mismo cambio en la consulta.
+  `
+  DROP TRIGGER lyric_lines_ai;
+  DROP TRIGGER lyric_lines_ad;
+  DROP TRIGGER lyric_lines_au;
+  DROP TRIGGER lyric_lines_tri_ai;
+  DROP TRIGGER lyric_lines_tri_ad;
+  DROP TRIGGER lyric_lines_tri_au;
+  DROP TABLE lyric_lines_fts;
+  DROP TABLE lyric_lines_tri;
+
+  CREATE VIEW lyric_lines_search AS
+    SELECT id, ${ENYE_SQL("text")} AS text FROM lyric_lines;
+
+  CREATE VIRTUAL TABLE lyric_lines_fts USING fts5(
+    text,
+    content = 'lyric_lines_search',
+    content_rowid = 'id',
+    tokenize = 'unicode61 remove_diacritics 2'
+  );
+  CREATE VIRTUAL TABLE lyric_lines_tri USING fts5(
+    text,
+    content = 'lyric_lines_search',
+    content_rowid = 'id',
+    tokenize = 'trigram remove_diacritics 1'
+  );
+  CREATE TRIGGER lyric_lines_ai AFTER INSERT ON lyric_lines BEGIN
+    INSERT INTO lyric_lines_fts(rowid, text) VALUES (new.id, ${ENYE_SQL("new.text")});
+    INSERT INTO lyric_lines_tri(rowid, text) VALUES (new.id, ${ENYE_SQL("new.text")});
+  END;
+  CREATE TRIGGER lyric_lines_ad AFTER DELETE ON lyric_lines BEGIN
+    INSERT INTO lyric_lines_fts(lyric_lines_fts, rowid, text) VALUES ('delete', old.id, ${ENYE_SQL("old.text")});
+    INSERT INTO lyric_lines_tri(lyric_lines_tri, rowid, text) VALUES ('delete', old.id, ${ENYE_SQL("old.text")});
+  END;
+  CREATE TRIGGER lyric_lines_au AFTER UPDATE ON lyric_lines BEGIN
+    INSERT INTO lyric_lines_fts(lyric_lines_fts, rowid, text) VALUES ('delete', old.id, ${ENYE_SQL("old.text")});
+    INSERT INTO lyric_lines_tri(lyric_lines_tri, rowid, text) VALUES ('delete', old.id, ${ENYE_SQL("old.text")});
+    INSERT INTO lyric_lines_fts(rowid, text) VALUES (new.id, ${ENYE_SQL("new.text")});
+    INSERT INTO lyric_lines_tri(rowid, text) VALUES (new.id, ${ENYE_SQL("new.text")});
+  END;
+  INSERT INTO lyric_lines_fts(lyric_lines_fts) VALUES ('rebuild');
+  INSERT INTO lyric_lines_tri(lyric_lines_tri) VALUES ('rebuild');
   `,
 ];
 

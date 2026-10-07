@@ -183,7 +183,8 @@ function replaceLines(db: DB, trackId: number, lines: LyricLine[]) {
   db.prepare("DELETE FROM lyric_lines WHERE track_id = ?").run(trackId);
   db.prepare("DELETE FROM lyric_chunks WHERE track_id = ?").run(trackId);
   const insLine = db.prepare("INSERT INTO lyric_lines (track_id, line_index, time_ms, text) VALUES (?, ?, ?, ?)");
-  lines.forEach((l, i) => insLine.run(trackId, i, l.timeMs, l.text));
+  // NFC para que la ñ sea un solo carácter (los índices de búsqueda dependen de eso).
+  lines.forEach((l, i) => insLine.run(trackId, i, l.timeMs, l.text.normalize("NFC")));
   const insChunk = db.prepare(
     "INSERT INTO lyric_chunks (track_id, chunk_index, start_line, end_line, start_ms, text) VALUES (?, ?, ?, ?, ?, ?)",
   );

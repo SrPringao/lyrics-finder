@@ -52,6 +52,12 @@ describe("resaltado en el panel", () => {
     expect(hits("ma ma", "ma", "contiene")).toEqual([]);
   });
 
+  it("distingue la ñ de la n", () => {
+    expect(hits("Soy un MEÑO de corazón", "meño", "palabra")).toEqual(["MEÑO"]);
+    expect(hits("Soy un MEÑO de corazón", "meno", "palabra")).toEqual([]);
+    expect(hits("No es meno", "meño", "contiene")).toEqual([]);
+  });
+
   it("reconstruye el texto original sin perder caracteres", () => {
     const text = "Ñandú, ¿dónde está Madrid?";
     expect(highlightTerms(text, "madrid", "palabra").map((s) => s.text).join("")).toBe(text);

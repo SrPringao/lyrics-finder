@@ -16,8 +16,13 @@ interface Phrase {
   prefix: boolean;
 }
 
+// Quita acentos pero conserva la ñ (en NFD es "n" + U+0303), igual que la búsqueda.
 function fold(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return s
+    .normalize("NFD")
+    .replace(/(?<![nN])\u0303|[\u0300-\u0302\u0304-\u036f]/g, "")
+    .normalize("NFC")
+    .toLowerCase();
 }
 
 const cleanWord = (w: string) => fold(w.replace(/["*]/g, "")).replace(/[^\p{L}\p{N}]/gu, "");

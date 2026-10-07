@@ -8,6 +8,26 @@ export const MIN_CONTAINS_LENGTH = 3;
 export const HL_START = "\u0001";
 export const HL_END = "\u0002";
 
+/** Los índices guardan ñ/Ñ como este carácter para que no se pliegue a "n" (ver migración v7). */
+const ENYE = "\uE000";
+const protectEnye = (s: string) => s.normalize("NFC").replace(/[ñÑ]/g, ENYE);
+
+/** Devuelve las ñ al texto resaltado usando la línea original (cada ñ ocupa un solo carácter en ambos). */
+function restoreEnye(highlighted: string, original: string): string {
+  if (!highlighted.includes(ENYE)) return highlighted;
+  let i = 0;
+  let out = "";
+  for (const ch of highlighted) {
+    if (ch === HL_START || ch === HL_END) {
+      out += ch;
+      continue;
+    }
+    out += ch === ENYE ? original[i] : ch;
+    i += ch.length;
+  }
+  return out;
+}
+
 /**
  * Convierte lo que escribe el usuario en una expresión FTS5 segura:
  *  - varias palabras seguidas se buscan juntas y en ese orden, como frase ("me cocina")
@@ -33,7 +53,7 @@ export function parseQuery(input: string, mode: SearchMode = "palabra"): { match
       return;
     }
     // En "contiene" ya se busca dentro de las palabras: el * no hace falta.
-    parts.push(`"${phrase}"${prefix && mode === "palabra" ? "*" : ""}`);
+    parts.push(`"${protectEnye(phrase)}"${prefix && mode === "palabra" ? "*" : ""}`);
   };
 
   let run: string[] = [];
@@ -115,7 +135,7 @@ export function searchLyrics(
   const rows = db
     .prepare(
       `SELECT ll.id AS lineId, ll.track_id AS trackId, ll.line_index AS lineIndex, ll.time_ms AS timeMs,
-              highlight(${fts}, 0, @hs, @he) AS highlighted,
+              highlight(${fts}, 0, @hs, @he) AS highlighted, ll.text AS original,
               prev.text AS before, next.text AS after,
               t.title, t.artist, t.album, t.spotify_uri AS spotifyUri, t.spotify_status AS spotifyStatus, t.cover_url AS coverUrl, t.lyrics_status AS lyricsStatus,
               ${fts}.rank AS rank
@@ -129,7 +149,7 @@ export function searchLyrics(
        LIMIT @limit`,
     )
     .all({ match, hs: HL_START, he: HL_END, playlistId: opts.playlistId ?? null, limit: limit + 1 }) as (LineHit &
-    Omit<TrackHits, "hits"> & { rank: number })[];
+    Omit<TrackHits, "hits"> & { rank: number; original: string })[];
 
   const truncated = rows.length > limit;
   const byTrack = new Map<number, TrackHits & { bestRank: number }>();
@@ -155,7 +175,7 @@ export function searchLyrics(
       lineIndex: r.lineIndex,
       timeMs: r.timeMs,
       rank: r.rank,
-      highlighted: r.highlighted,
+      highlighted: restoreEnye(r.highlighted, r.original),
       before: r.before,
       after: r.after,
     });

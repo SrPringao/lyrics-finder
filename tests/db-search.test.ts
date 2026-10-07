@@ -226,6 +226,26 @@ describe("búsqueda 'contiene el texto'", () => {
     expect(searchLyrics(db, '"tren noct"', { mode: "contiene" }).totalLines).toBe(1);
   });
 
+  it("distingue la ñ de la n en ambos modos", () => {
+    const { playlistId } = importPlaylist(db, "Eñes", playlist([["Uno", "A"], ["Dos", "B"]]));
+    const [uno, dos] = tracksToFetch(db, playlistId);
+    saveLyricsResult(db, uno.id, { status: "plain", syncedLyrics: null, plainLyrics: "Soy un MEÑO de corazón", lrclibId: 1, matchedVia: "get" });
+    saveLyricsResult(db, dos.id, { status: "plain", syncedLyrics: null, plainLyrics: "No es meno ni más", lrclibId: 2, matchedVia: "get" });
+    for (const mode of ["palabra", "contiene"] as const) {
+      expect(searchLyrics(db, "meño", { mode }).tracks.map((t) => t.title)).toEqual(["Uno"]);
+      expect(searchLyrics(db, "MEÑO", { mode }).tracks.map((t) => t.title)).toEqual(["Uno"]);
+      expect(searchLyrics(db, "meno", { mode }).tracks.map((t) => t.title)).toEqual(["Dos"]);
+    }
+    const hit = searchLyrics(db, "meño").tracks[0].hits[0];
+    expect(splitHighlighted(hit.highlighted)).toEqual([
+      { text: "Soy un ", mark: false },
+      { text: "MEÑO", mark: true },
+      { text: " de corazón", mark: false },
+    ]);
+    // Los acentos de las vocales siguen sin importar.
+    expect(searchLyrics(db, "corazon").totalLines).toBe(1);
+  });
+
   it("ignora términos de menos de 3 letras y lo reporta", () => {
     seed();
     expect(parseQuery("ma tren", "contiene")).toEqual({ match: '"ma tren"', ignored: [] });
